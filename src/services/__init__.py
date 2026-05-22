@@ -21,9 +21,12 @@ from src.services.credit_note_service import CreditNoteService
 from src.services.customer_service import CustomerService
 from src.services.establishment_service import EstablishmentService
 from src.services.invoice_service import FactusApiError, InvoiceService
+from src.services.mappers import customer_to_factus_dict, product_to_factus_dict
 from src.services.numbering_range_service import NumberingRangeService
 from src.services.product_service import ProductService
 from src.services.support_document_service import SupportDocumentService
+from src.services.tax.withholding import calculate as calculate_withholdings
+from src.services.validators import InvoiceValidator
 
 __all__ = [
     "AdjustmentNoteService",
@@ -33,7 +36,11 @@ __all__ = [
     "EstablishmentService",
     "FactusApiError",
     "InvoiceService",
+    "InvoiceValidator",
     "NumberingRangeService",
     "ProductService",
     "SupportDocumentService",
+    "calculate_withholdings",
+    "customer_to_factus_dict",
+    "product_to_factus_dict",
 ]

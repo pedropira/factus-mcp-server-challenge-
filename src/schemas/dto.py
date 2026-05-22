@@ -135,6 +135,12 @@ class InvoiceCreate(SQLModel):
     payment_details: list[dict]
     customer: dict
     items: list[dict]
+    allowance_charges: Optional[list[dict]] = Field(
+        default=None,
+        description="Descuentos y recargos globales. "
+        "Cada dict: {is_surcharge: bool, reason: str, "
+        "base_amount: str, amount: str}",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════

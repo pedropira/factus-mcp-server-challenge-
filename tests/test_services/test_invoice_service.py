@@ -15,8 +15,15 @@ from unittest.mock import ANY, AsyncMock, MagicMock
 import httpx
 import pytest
 
+from decimal import Decimal
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
+
 from src.infrastructure.factus_client import FactusClient
 from src.schemas.dto import InvoiceCreate
+from src.schemas.models import Customer, Establishment, Product
 from src.services.invoice_service import FactusApiError, InvoiceService
 
 
@@ -159,10 +166,10 @@ class TestInvoiceServiceCreate:
 
         # Verify totals calculated
         total = float(payload["payment_details"][0]["amount"])
-        # Item A: 2 x 25000 x (1-0) = 50000
-        # Item B: 1 x 50000 x (1-0.10) = 45000
-        # Gross = 95000, Tax = 18050, Total = 113050
-        assert total == 113050.00, f"Expected 113050.00, got {total}"
+        # Item A: 2 x 25000 = 50000 gross, tax = 50000*(19/119) = 7983.19
+        # Item B: 1 x 50000 x 0.9 = 45000 gross, tax = 45000*(19/119) = 7184.87
+        # Gross = 95000, Tax = 15168.06, Total = 110168.06
+        assert total == 110168.06, f"Expected 110168.06, got {total}"
 
         # Verify response
         assert result["status"] == "Created"
@@ -428,29 +435,44 @@ class TestEnrichWithTotals:
     def test_calculates_single_item(self) -> None:
         payload = {
             "items": [
-                {"quantity": "1.00", "price": "10000.00", "discount_rate": "0.00"}
+                {
+                    "quantity": "1.00",
+                    "price": "10000.00",
+                    "discount_rate": "0.00",
+                    "taxes": [{"code": "01", "rate": "19.00"}],
+                }
             ],
             "payment_details": [{"amount": "0.00"}],
         }
         result = InvoiceService._enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
-        # gross=10000, tax=1900, total=11900
-        assert total == 11900.00
+        # gross=10000, tax=10000*(19/119)=1596.64, total=11596.64
+        assert total == 11596.64
 
     def test_calculates_multi_item_with_discount(self) -> None:
         payload = {
             "items": [
-                {"quantity": "2.00", "price": "25000.00", "discount_rate": "0.00"},
-                {"quantity": "1.00", "price": "50000.00", "discount_rate": "10.00"},
+                {
+                    "quantity": "2.00",
+                    "price": "25000.00",
+                    "discount_rate": "0.00",
+                    "taxes": [{"code": "01", "rate": "19.00"}],
+                },
+                {
+                    "quantity": "1.00",
+                    "price": "50000.00",
+                    "discount_rate": "10.00",
+                    "taxes": [{"code": "01", "rate": "19.00"}],
+                },
             ],
             "payment_details": [{"amount": "0.00"}],
         }
         result = InvoiceService._enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
-        # Item A: 2 x 25000 = 50000
-        # Item B: 1 x 50000 x 0.90 = 45000
-        # Gross = 95000, Tax = 18050, Total = 113050
-        assert total == 113050.00
+        # Item A: 2 x 25000 = 50000 gross, tax=50000*(19/119)=7983.19
+        # Item B: 1 x 50000 x 0.90 = 45000 gross, tax=45000*(19/119)=7184.87
+        # Gross = 95000, Tax = 15168.06, Total = 110168.06
+        assert total == 110168.06
 
     def test_no_items(self) -> None:
         payload = {
@@ -459,3 +481,225 @@ class TestEnrichWithTotals:
         }
         result = InvoiceService._enrich_with_totals(payload)
         assert float(result["payment_details"][0]["amount"]) == 0.00
+
+    def test_with_allowance_charges_discounts_and_surcharges(self) -> None:
+        """Allowance charges: discount rest, surcharge suma."""
+        payload = {
+            "items": [
+                {
+                    "quantity": "1.00",
+                    "price": "100000.00",
+                    "discount_rate": "0.00",
+                    "taxes": [{"code": "01", "rate": "19.00"}],
+                }
+            ],
+            "allowance_charges": [
+                {"is_surcharge": False, "reason": "Flete", "base_amount": "100000.00", "amount": "5000.00"},
+                {"is_surcharge": True, "reason": "Descuento pronto pago", "base_amount": "100000.00", "amount": "3000.00"},
+            ],
+            "payment_details": [{"amount": "0.00"}],
+        }
+        result = InvoiceService._enrich_with_totals(payload)
+        total = float(result["payment_details"][0]["amount"])
+        # gross=100000, tax=100000*(19/119)=15966.39, disc=-5000, surch=+3000
+        # total = 100000 + 15966.39 - 5000 + 3000 = 113966.39
+        assert total == 113966.39
+
+    def test_multiple_tax_rates(self) -> None:
+        """Item with two tax rates (IVA 19% + INC 8%) → both calculated."""
+        payload = {
+            "items": [
+                {
+                    "quantity": "1.00",
+                    "price": "100000.00",
+                    "discount_rate": "0.00",
+                    "taxes": [
+                        {"code": "01", "rate": "19.00"},
+                        {"code": "04", "rate": "8.00"},
+                    ],
+                }
+            ],
+            "payment_details": [{"amount": "0.00"}],
+        }
+        result = InvoiceService._enrich_with_totals(payload)
+        total = float(result["payment_details"][0]["amount"])
+        # gross=100000, tax_iva=100000*(19/119)=15966.39, tax_inc=100000*(8/108)=7407.41
+        # total = 100000 + 15966.39 + 7407.41 = 123373.80
+        assert total == 123373.80
+
+
+# ─── CREATE WITH NUMBERING ───────────────────────────────────────────────
+
+
+class TestInvoiceServiceCreateWithNumbering:
+    """Tests for create_with_numbering() — full Colombian business flow."""
+
+    @pytest.fixture
+    def sample_customer(self) -> Customer:
+        return Customer(
+            id=1,
+            identification_document_id=6,  # NIT
+            identification="900123456",
+            dv="5",
+            company="Empresa SAS",
+            names="",
+            email="factura@empresa.com",
+            address="Calle 100 # 20-30",
+            municipality_id="11001",
+            tribute_id="22",  # Gran Contribuyente
+            legal_organization_id="1",  # Persona jurídica
+        )
+
+    @pytest.fixture
+    def sample_products(self) -> list[Product]:
+        return [
+            Product(
+                id=1,
+                code_reference="PROD-001",
+                name="Producto A",
+                price=Decimal("25000.00"),
+                tax_rate="19.00",
+                unit_measure_id=70,
+                standard_code_id=1,
+                tribute_id=1,
+                is_excluded=False,
+            ),
+            Product(
+                id=2,
+                code_reference="PROD-002",
+                name="Producto B",
+                price=Decimal("50000.00"),
+                tax_rate="19.00",
+                unit_measure_id=70,
+                standard_code_id=1,
+                tribute_id=1,
+                is_excluded=False,
+            ),
+        ]
+
+    @pytest.fixture
+    def mock_numbering_service(self) -> MagicMock:
+        mock = MagicMock()
+        mock.next_available = AsyncMock(return_value=990000001)
+        return mock
+
+    async def test_create_with_numbering_happy_path(
+        self,
+        service: InvoiceService,
+        mock_factus: MagicMock,
+        sample_create_data: InvoiceCreate,
+        sample_customer: Customer,
+        sample_products: list[Product],
+        mock_numbering_service: MagicMock,
+        factus_success_response: httpx.Response,
+    ) -> None:
+        """Happy path: maps models, validates, calculates taxes, sends."""
+        mock_factus.post.return_value = factus_success_response
+
+        result = await service.create_with_numbering(
+            data=sample_create_data,
+            numbering_range_id=1,
+            numbering_service=mock_numbering_service,
+            customer=sample_customer,
+            products=sample_products,
+        )
+
+        # Verify validation was called
+        mock_numbering_service.next_available.assert_awaited_once_with(1)
+
+        # Verify Factus API was called
+        mock_factus.post.assert_awaited_once()
+        call_kwargs = mock_factus.post.await_args.kwargs
+        payload = call_kwargs["json"]
+
+        # Customer should be mapped from models
+        assert payload["customer"]["identification_document_code"] == "31"  # NIT
+        assert payload["customer"]["identification"] == "900123456"
+        assert payload["customer"]["tribute_code"] == "22"
+
+        # Items mapped from products
+        assert len(payload["items"]) == 2
+        assert payload["items"][0]["code_reference"] == "PROD-001"
+        assert payload["items"][1]["code_reference"] == "PROD-002"
+
+        # Totals calculated
+        total = float(payload["payment_details"][0]["amount"])
+        assert total == 110168.06
+
+        # Withholding taxes should be present (Gran Contribuyente + transfer payment)
+        # ReteIVA triggers because Gran Contribuyente (tribute "22")
+        assert "withholding_taxes" in payload["items"][0]
+        assert "withholding_taxes" in payload["items"][1]
+
+        # Response returned correctly
+        assert result["status"] == "Created"
+        assert result["data"]["number"] == "SETP990003793"
+
+    async def test_create_with_numbering_validation_failure(
+        self,
+        service: InvoiceService,
+        mock_factus: MagicMock,
+        sample_create_data: InvoiceCreate,
+        mock_numbering_service: MagicMock,
+    ) -> None:
+        """Validation failure → raises ValueError."""
+        # Remove required customer field to trigger validation
+        sample_create_data.customer = {}  # type: ignore[assignment]
+
+        with pytest.raises(ValueError, match="Invoice validation failed"):
+            await service.create_with_numbering(
+                data=sample_create_data,
+                numbering_range_id=1,
+                numbering_service=mock_numbering_service,
+            )
+
+        # Factus API should NOT have been called
+        mock_factus.post.assert_not_awaited()
+
+    async def test_create_with_numbering_factus_error(
+        self,
+        service: InvoiceService,
+        mock_factus: MagicMock,
+        sample_create_data: InvoiceCreate,
+        mock_numbering_service: MagicMock,
+    ) -> None:
+        """Factus API error → FactusApiError."""
+        mock_factus.post.return_value = httpx.Response(
+            422,
+            json={"message": "Validation error from Factus"},
+        )
+
+        with pytest.raises(FactusApiError) as exc:
+            await service.create_with_numbering(
+                data=sample_create_data,
+                numbering_range_id=1,
+                numbering_service=mock_numbering_service,
+            )
+
+        assert exc.value.status_code == 422
+
+    async def test_create_with_numbering_no_models_raw_dicts(
+        self,
+        service: InvoiceService,
+        mock_factus: MagicMock,
+        sample_create_data: InvoiceCreate,
+        mock_numbering_service: MagicMock,
+        factus_success_response: httpx.Response,
+    ) -> None:
+        """Without Customer/Product models → uses raw dicts from DTO."""
+        mock_factus.post.return_value = factus_success_response
+
+        result = await service.create_with_numbering(
+            data=sample_create_data,
+            numbering_range_id=1,
+            numbering_service=mock_numbering_service,
+        )
+
+        # Customer should be the raw dict from DTO (not mapped)
+        call_kwargs = mock_factus.post.await_args.kwargs
+        payload = call_kwargs["json"]
+        assert payload["customer"]["identification_document_code"] == "13"
+        assert payload["customer"]["names"] == "Cliente de prueba"
+
+        assert result["status"] == "Created"
+

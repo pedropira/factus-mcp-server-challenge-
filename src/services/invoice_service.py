@@ -19,8 +19,16 @@ from typing import Any, Optional
 
 import httpx
 
+from decimal import Decimal
+from typing import Any, Optional
+
 from src.infrastructure.factus_client import FactusClient
 from src.schemas.dto import InvoiceCreate
+from src.schemas.models import Customer, Establishment, Product
+from src.services.mappers import customer_to_factus_dict, product_to_factus_dict
+from src.services.numbering_range_service import NumberingRangeService
+from src.services.tax.withholding import calculate as calculate_withholdings
+from src.services.validators import InvoiceValidator
 
 
 class FactusApiError(Exception):
@@ -71,6 +79,102 @@ class InvoiceService:
         payload = self._build_request(data)
         payload = self._enrich_with_totals(payload)
 
+        response = await self._factus.post("/v2/bills/validate", json=payload)
+        await response.aread()
+
+        if not response.is_success:
+            raise self._build_error(response)
+
+        return response.json()
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # CREATE WITH NUMBERING — Full Colombian business flow
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def create_with_numbering(
+        self,
+        data: InvoiceCreate,
+        numbering_range_id: int,
+        numbering_service: NumberingRangeService,
+        customer: Optional[Customer] = None,
+        establishment: Optional[Establishment] = None,
+        products: Optional[list[Product]] = None,
+    ) -> dict:
+        """Create invoice with DIAN numbering, mapping, and tax calculation.
+
+        Full Colombian business flow:
+          1. Pre-validate payload
+          2. Map Customer/Product models → Factus API dicts
+          3. Get next available number from numbering range
+          4. Auto-calculate withholding taxes (ReteRenta, ReteIVA, ReteICA, etc.)
+          5. Calculate totals per item using actual tax rates
+          6. Send to Factus API
+          7. Return response
+
+        Args:
+            data: Invoice creation data.
+            numbering_range_id: ID of the DIAN numbering range to use.
+            numbering_service: NumberingRangeService instance.
+            customer: Optional Customer model (if provided, maps to Factus dict).
+            establishment: Optional Establishment model for customer mapping.
+            products: Optional Product models list (if provided, maps to items dicts).
+
+        Returns:
+            Factus API response dict.
+
+        Raises:
+            ValueError: If validation fails or numbering range is exhausted.
+            FactusApiError: If Factus API returns an error.
+        """
+        # 1. Build base payload
+        payload = self._build_request(data)
+
+        # 2. Map models if provided
+        if customer is not None:
+            payload["customer"] = customer_to_factus_dict(customer, establishment)
+
+        if products is not None:
+            mapped_items = []
+            for i, prod in enumerate(products):
+                qty = data.items[i].get("quantity", "1") if i < len(data.items) else "1"
+                disc = data.items[i].get("discount_rate", "0.00") if i < len(data.items) else "0.00"
+                mapped_items.append(product_to_factus_dict(prod, qty, disc))
+            payload["items"] = mapped_items
+
+        # 3. Validate before proceeding
+        validation_errors = InvoiceValidator.validate(payload)
+        if validation_errors:
+            raise ValueError(
+                "Invoice validation failed:\n  - "
+                + "\n  - ".join(validation_errors)
+            )
+
+        # 4. Get next available number (validates range exists and is not exhausted)
+        _ = await numbering_service.next_available(numbering_range_id)
+
+        # 5. Calculate withholding taxes
+        items = payload.get("items", [])
+        gross_total = sum(
+            Decimal(str(item.get("price", "0"))) * Decimal(str(item.get("quantity", "1")))
+            * (Decimal("1") - Decimal(str(item.get("discount_rate", "0"))) / Decimal("100"))
+            for item in items
+        )
+        withholding_map = calculate_withholdings(
+            customer=payload.get("customer", {}),
+            items=items,
+            gross_total=gross_total,
+            payment_details=payload.get("payment_details"),
+        )
+
+        # Embed withholding_taxes into each item
+        for idx, wt_list in withholding_map.items():
+            if idx < len(items) and wt_list:
+                items[idx]["withholding_taxes"] = wt_list
+
+        # 7. Calculate totals with per-item tax rates
+        payload = self._enrich_with_totals(payload)
+
+        # 8. Send to Factus
         response = await self._factus.post("/v2/bills/validate", json=payload)
         await response.aread()
 
@@ -207,8 +311,9 @@ class InvoiceService:
         """Construye el body exacto que espera POST /v2/bills/validate.
 
         Basado en pruebas reales contra el sandbox (explore_factus_api.py).
+        Incluye allowance_charges si están presentes en el DTO.
         """
-        return {
+        payload: dict[str, Any] = {
             "reference_code": data.reference_code,
             "document": data.document or "01",
             "operation_type": data.operation_type or "10",
@@ -219,35 +324,99 @@ class InvoiceService:
             "items": data.items,
         }
 
+        if data.allowance_charges:
+            payload["allowance_charges"] = data.allowance_charges
+
+        return payload
+
     @staticmethod
     def _enrich_with_totals(payload: dict) -> dict:
-        """Calcula y asigna el total de paga basado en items.
+        """Calcula totales por item usando las tasas de impuesto reales.
 
-        Fórmula por item:
-            neto = price * quantity * (1 - discount_rate/100)
-            iva  = neto * 0.19  (si IVA 19%)
-            total_item = neto + iva
+        Para cada item:
+          1. Calcula gross_value = price * quantity * (1 - discount_rate/100)
+          2. Para cada impuesto en item.taxes[], calcula:
+               tax_amount = gross_value * (rate / (100 + rate))
+             (porque el precio ya incluye impuestos)
+          3. Suma todos los impuestos del item
+          4. Total_item = gross_value
 
-        El total del pago es la suma de total_item de todos los items.
+        El total general = suma de gross_values + suma de taxes.
+        Si hay allowance_charges, los descuentos restan y los recargos suman.
         """
         items = payload.get("items", [])
-        gross = 0.0
-        for item in items:
-            qty = float(item.get("quantity", 1))
-            price = float(item.get("price", 0))
-            disc = float(item.get("discount_rate", 0))
-            net = price * qty * (1 - disc / 100)
-            gross += net
+        total_gross = Decimal("0")
+        total_tax = Decimal("0")
 
-        tax_rate = 0.19  # asumimos IVA 19% como default
-        tax = gross * tax_rate
-        total = gross + tax
+        for item in items:
+            gross, tax = InvoiceService._calculate_item_taxes(item)
+            total_gross += gross
+            total_tax += tax
+
+        # Include allowance_charges in total
+        allowance_total = Decimal("0")
+        allowance_charges = payload.get("allowance_charges", [])
+        if allowance_charges:
+            for ac in allowance_charges:
+                try:
+                    amount = Decimal(ac.get("amount", "0"))
+                except Exception:
+                    amount = Decimal("0")
+                if ac.get("is_surcharge", False):
+                    allowance_total += amount  # Surcharge adds
+                else:
+                    allowance_total -= amount  # Discount subtracts
+
+        total = total_gross + total_tax + allowance_total
 
         details = payload.get("payment_details", [])
         if details:
             details[0]["amount"] = f"{total:.2f}"
 
         return payload
+
+    @staticmethod
+    def _calculate_item_taxes(
+        item: dict[str, Any],
+    ) -> tuple[Decimal, Decimal]:
+        """Calculate gross and tax amounts for a single item.
+
+        The price in Factus API includes taxes (price CON IVA incluído).
+        To extract the tax:
+            tax_amount = gross * (rate / (100 + rate))
+
+        Args:
+            item: Item dict with price, quantity, discount_rate, taxes[].
+
+        Returns:
+            Tuple of (gross_value, tax_amount) as Decimals.
+        """
+        try:
+            price = Decimal(str(item.get("price", "0")))
+            qty = Decimal(str(item.get("quantity", "1")))
+            disc = Decimal(str(item.get("discount_rate", "0")))
+        except Exception:
+            return Decimal("0"), Decimal("0")
+
+        gross = price * qty * (Decimal("1") - disc / Decimal("100"))
+        gross = gross.quantize(Decimal("0.01"))
+
+        # Calculate taxes from the item's tax rates
+        total_tax = Decimal("0")
+        taxes = item.get("taxes", [])
+        for tax_entry in taxes:
+            try:
+                rate = Decimal(tax_entry.get("rate", "0"))
+            except Exception:
+                continue
+            if rate > Decimal("0"):
+                # Price includes tax, so tax = gross * (rate / (100 + rate))
+                tax_amount = gross * rate / (Decimal("100") + rate)
+                tax_amount = tax_amount.quantize(Decimal("0.01"))
+                total_tax += tax_amount
+
+        total_tax = total_tax.quantize(Decimal("0.01"))
+        return gross, total_tax
 
     # ──────────────────────────────────────────────────────────────────────────
     # PRIVATE — response helpers
