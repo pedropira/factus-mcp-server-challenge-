@@ -1,0 +1,174 @@
+"""
+MCP tools for electronic credit note operations via Factus API.
+
+All tools use FactusClient directly (no local DB).
+Credit notes use Factus-internal IDs for get/delete/download operations.
+"""
+
+from __future__ import annotations
+
+import base64
+from decimal import Decimal
+from typing import TYPE_CHECKING
+
+from src.mcp_server.schemas.tool_params import (
+    CreateCreditNoteParams,
+    DeleteCreditNoteParams,
+    DownloadCreditNotePdfParams,
+    DownloadCreditNoteXmlParams,
+    GetCreditNoteParams,
+    ListCreditNotesParams,
+)
+from src.schemas.dto import CreditNoteCreate
+from src.services.credit_note_service import CreditNoteService
+
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
+
+    from src.mcp_server.main import ServerDeps
+
+
+def _json_safe(d: dict) -> dict:
+    """Convert Decimal values to strings for JSON serialization."""
+    return {k: str(v) if isinstance(v, Decimal) else v for k, v in d.items()}
+
+
+def _item_to_factus(item: object) -> dict:
+    """Convert _InvoiceItemInput to Factus API item dict with taxes array."""
+    d = _json_safe(item.model_dump(exclude_none=True))
+    d["taxes"] = [{"rate": item.tax_rate}]
+    return d
+
+
+def register(server: FastMCP, deps: ServerDeps) -> None:
+    """Register all credit note tools on the MCP server."""
+    svc = CreditNoteService(deps.factus)
+
+    @server.tool()
+    async def create_credit_note(params: CreateCreditNoteParams) -> dict:
+        """Create a credit note via Factus API (POST /v2/credit-notes).
+
+        Credit notes correct existing invoices. The invoice_reference is
+        the Factus-assigned number of the invoice being corrected.
+        correction_concept_code: 1=devolución, 2=anulación, etc.
+        """
+        try:
+            data = CreditNoteCreate(
+                reference_code=params.reference_code,
+                correction_concept_code=params.correction_concept_code,
+                observation=params.observation or "",
+                send_email=params.send_email,
+                invoice_reference=params.invoice_reference,
+                payment_details=[
+                    _json_safe(pd.model_dump()) for pd in params.payment_details
+                ],
+                customer=params.customer,
+                items=[_item_to_factus(i) for i in params.items],
+            )
+            result = await svc.create(data)
+            return {"success": True, "data": result}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @server.tool()
+    async def list_credit_notes(params: ListCreditNotesParams) -> dict:
+        """List credit notes from Factus API with optional filters.
+
+        Filters: status, reference_code. Pagination via offset/limit (max 100).
+        The response includes factus_id values for get/delete/download tools.
+        """
+        try:
+            filters: dict[str, str] = {}
+            if params.status is not None:
+                filters["status"] = params.status
+            if params.reference_code is not None:
+                filters["reference_code"] = params.reference_code
+            result = await svc.list(
+                limit=params.limit,
+                offset=params.offset,
+                **filters,
+            )
+            return {"success": True, "data": result}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @server.tool()
+    async def get_credit_note(params: GetCreditNoteParams) -> dict:
+        """Get a credit note by its Factus-internal ID.
+
+        Use the factus_id returned by list_credit_notes or search via
+        get_credit_note_by_reference instead.
+        """
+        try:
+            result = await svc.get_by_id(params.factus_id)
+            if result is None:
+                return {
+                    "success": False,
+                    "error": f"Credit note with factus_id {params.factus_id} not found",
+                }
+            return {"success": True, "data": result}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @server.tool()
+    async def delete_credit_note(params: DeleteCreditNoteParams) -> dict:
+        """Delete a credit note by its Factus-internal ID.
+
+        Permanently removes the credit note from Factus. Use with caution.
+        """
+        try:
+            result = await svc.delete(params.factus_id)
+            return {"success": True, "data": result}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @server.tool()
+    async def download_credit_note_pdf(
+        params: DownloadCreditNotePdfParams,
+    ) -> dict:
+        """Download a credit note PDF by its Factus-internal ID.
+
+        Returns base64-encoded PDF content.
+        """
+        try:
+            response = await svc.download_pdf(params.factus_id)
+            content = base64.b64encode(response.content).decode()
+            return {
+                "success": True,
+                "data": {
+                    "content": content,
+                    "content_type": response.headers.get(
+                        "content-type", "application/pdf"
+                    ),
+                    "filename": f"credit_note_{params.factus_id}.pdf",
+                },
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    @server.tool()
+    async def download_credit_note_xml(
+        params: DownloadCreditNoteXmlParams,
+    ) -> dict:
+        """Download a credit note XML by its Factus-internal ID.
+
+        Returns base64-encoded XML content.
+        """
+        try:
+            response = await svc.download_xml(params.factus_id)
+            content = base64.b64encode(response.content).decode()
+            return {
+                "success": True,
+                "data": {
+                    "content": content,
+                    "content_type": response.headers.get(
+                        "content-type", "application/xml"
+                    ),
+                    "filename": f"credit_note_{params.factus_id}.xml",
+                },
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+
+__all__ = ["register"]
