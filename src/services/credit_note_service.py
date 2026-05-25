@@ -50,6 +50,7 @@ class CreditNoteService:
             "observation": data.observation or "",
             "send_email": data.send_email,
             "bill_number": data.bill_number,
+            "numbering_range_id": data.numbering_range_id,
             "payment_details": data.payment_details,
             "customer": data.customer,
             "items": data.items,
@@ -59,8 +60,9 @@ class CreditNoteService:
         # (default "20" = NC que referencia factura)
         payload["customization_id"] = "20"
 
-        if data.numbering_range_id is not None:
-            payload["numbering_range_id"] = data.numbering_range_id
+        # Calculate totals (payment_details[0].amount)
+        from src.services.enrich import enrich_with_totals
+        payload = enrich_with_totals(payload)
 
         response = await self._factus.post("/v2/credit-notes/validate", json=payload)
         await response.aread()

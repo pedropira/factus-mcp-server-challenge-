@@ -435,6 +435,8 @@ class TestInvoiceDownload:
 
 class TestEnrichWithTotals:
     def test_calculates_single_item(self) -> None:
+        from src.services.enrich import enrich_with_totals
+
         payload = {
             "items": [
                 {
@@ -446,12 +448,14 @@ class TestEnrichWithTotals:
             ],
             "payment_details": [{"amount": "0.00"}],
         }
-        result = InvoiceService._enrich_with_totals(payload)
+        result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
         # gross=10000, tax=10000*(19/119)=1596.64, total=11596.64
         assert total == 11596.64
 
     def test_calculates_multi_item_with_discount(self) -> None:
+        from src.services.enrich import enrich_with_totals
+
         payload = {
             "items": [
                 {
@@ -469,7 +473,7 @@ class TestEnrichWithTotals:
             ],
             "payment_details": [{"amount": "0.00"}],
         }
-        result = InvoiceService._enrich_with_totals(payload)
+        result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
         # Item A: 2 x 25000 = 50000 gross, tax=50000*(19/119)=7983.19
         # Item B: 1 x 50000 x 0.90 = 45000 gross, tax=45000*(19/119)=7184.87
@@ -477,14 +481,18 @@ class TestEnrichWithTotals:
         assert total == 110168.06
 
     def test_no_items(self) -> None:
+        from src.services.enrich import enrich_with_totals
+
         payload = {
             "items": [],
             "payment_details": [{"amount": "0.00"}],
         }
-        result = InvoiceService._enrich_with_totals(payload)
+        result = enrich_with_totals(payload)
         assert float(result["payment_details"][0]["amount"]) == 0.00
 
     def test_with_allowance_charges_discounts_and_surcharges(self) -> None:
+        from src.services.enrich import enrich_with_totals
+
         """Allowance charges: discount rest, surcharge suma."""
         payload = {
             "items": [
@@ -501,13 +509,15 @@ class TestEnrichWithTotals:
             ],
             "payment_details": [{"amount": "0.00"}],
         }
-        result = InvoiceService._enrich_with_totals(payload)
+        result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
         # gross=100000, tax=100000*(19/119)=15966.39, disc=-5000, surch=+3000
         # total = 100000 + 15966.39 - 5000 + 3000 = 113966.39
         assert total == 113966.39
 
     def test_multiple_tax_rates(self) -> None:
+        from src.services.enrich import enrich_with_totals
+
         """Item with two tax rates (IVA 19% + INC 8%) → both calculated."""
         payload = {
             "items": [
@@ -523,7 +533,7 @@ class TestEnrichWithTotals:
             ],
             "payment_details": [{"amount": "0.00"}],
         }
-        result = InvoiceService._enrich_with_totals(payload)
+        result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
         # gross=100000, tax_iva=100000*(19/119)=15966.39, tax_inc=100000*(8/108)=7407.41
         # total = 100000 + 15966.39 + 7407.41 = 123373.80

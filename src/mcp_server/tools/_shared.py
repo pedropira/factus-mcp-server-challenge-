@@ -48,21 +48,39 @@ def item_to_factus(item: object) -> dict:
     a los códigos DIAN que la API de Factus espera, y arma el array de
     taxes con code + rate.
 
-    Importante: NO usamos exclude_none=True porque discount_rate es
-    requerido por la API de Factus (incluso si es 0.00).
+    La API de Factus requiere que quantity y discount_rate sean strings,
+    is_excluded sea string "true"/"false", y total_discount esté presente.
     """
     d = json_safe(item.model_dump())
-    # Siempre incluir discount_rate — la API de Factus lo requiere
+
+    # ── Siempre incluir discount_rate — la API de Factus lo requiere ──
     if d.get("discount_rate") is None:
         d["discount_rate"] = "0.00"
+    elif not isinstance(d["discount_rate"], str):
+        d["discount_rate"] = f"{d['discount_rate']:.2f}"
+
+    # ── quantity debe ser string ──
+    d["quantity"] = str(d["quantity"])
+
+    # ── Mapear IDs a códigos DIAN ──
     d["unit_measure_code"] = _map_unit_measure_id(item.unit_measure_id)
     d["standard_code"] = _map_standard_code_id(item.standard_code_id)
     tax_code = _map_item_tribute_to_tax_code(item.tribute_id)
     d["taxes"] = [{"code": tax_code, "rate": item.tax_rate}]
+
+    # ── is_excluded debe ser string ──
+    d["is_excluded"] = str(d.get("is_excluded", False)).lower()
+
+    # ── total_discount: price * quantity * (discount_rate / 100) ──
+    price = Decimal(str(item.price))
+    qty = Decimal(str(item.quantity))
+    disc = Decimal(d["discount_rate"])
+    total_discount = price * qty * disc / Decimal("100")
+    d["total_discount"] = f"{total_discount:.2f}"
+
+    # ── Limpiar campos internos ──
     d.pop("unit_measure_id", None)
     d.pop("standard_code_id", None)
     d.pop("tribute_id", None)
-    # convertir discount_rate a string (model_dump lo deja como Decimal o None)
-    if not isinstance(d["discount_rate"], str):
-        d["discount_rate"] = f"{d['discount_rate']:.2f}"
+
     return d

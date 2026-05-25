@@ -46,6 +46,7 @@ def sample_create_data() -> CreditNoteCreate:
         reference_code="CN-TEST-001",
         correction_concept_code="1",
         bill_number="SETP990003793",
+        numbering_range_id=1,
         payment_details=[
             {
                 "payment_form": "1",
@@ -124,7 +125,15 @@ class TestCreditNoteCreate:
                 "observation": "",
                 "send_email": False,
                 "bill_number": "SETP990003793",
-                "payment_details": sample_create_data.payment_details,
+                "numbering_range_id": 1,
+                "payment_details": [
+                    {
+                        "payment_form": "1",
+                        "payment_method_code": "10",
+                        "reference_code": "PAY-CN-001",
+                        "amount": "28991.60",
+                    }
+                ],
                 "customer": sample_create_data.customer,
                 "items": sample_create_data.items,
                 "customization_id": "20",

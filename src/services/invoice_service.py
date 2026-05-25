@@ -329,94 +329,10 @@ class InvoiceService:
 
         return payload
 
-    @staticmethod
-    def _enrich_with_totals(payload: dict) -> dict:
-        """Calcula totales por item usando las tasas de impuesto reales.
-
-        Para cada item:
-          1. Calcula gross_value = price * quantity * (1 - discount_rate/100)
-          2. Para cada impuesto en item.taxes[], calcula:
-               tax_amount = gross_value * (rate / (100 + rate))
-             (porque el precio ya incluye impuestos)
-          3. Suma todos los impuestos del item
-          4. Total_item = gross_value
-
-        El total general = suma de gross_values + suma de taxes.
-        Si hay allowance_charges, los descuentos restan y los recargos suman.
-        """
-        items = payload.get("items", [])
-        total_gross = Decimal("0")
-        total_tax = Decimal("0")
-
-        for item in items:
-            gross, tax = InvoiceService._calculate_item_taxes(item)
-            total_gross += gross
-            total_tax += tax
-
-        # Include allowance_charges in total
-        allowance_total = Decimal("0")
-        allowance_charges = payload.get("allowance_charges", [])
-        if allowance_charges:
-            for ac in allowance_charges:
-                try:
-                    amount = Decimal(ac.get("amount", "0"))
-                except Exception:
-                    amount = Decimal("0")
-                if ac.get("is_surcharge", False):
-                    allowance_total += amount  # Surcharge adds
-                else:
-                    allowance_total -= amount  # Discount subtracts
-
-        total = total_gross + total_tax + allowance_total
-
-        details = payload.get("payment_details", [])
-        if details:
-            details[0]["amount"] = f"{total:.2f}"
-
-        return payload
-
-    @staticmethod
-    def _calculate_item_taxes(
-        item: dict[str, Any],
-    ) -> tuple[Decimal, Decimal]:
-        """Calculate gross and tax amounts for a single item.
-
-        The price in Factus API includes taxes (price CON IVA incluído).
-        To extract the tax:
-            tax_amount = gross * (rate / (100 + rate))
-
-        Args:
-            item: Item dict with price, quantity, discount_rate, taxes[].
-
-        Returns:
-            Tuple of (gross_value, tax_amount) as Decimals.
-        """
-        try:
-            price = Decimal(str(item.get("price", "0")))
-            qty = Decimal(str(item.get("quantity", "1")))
-            disc = Decimal(str(item.get("discount_rate", "0")))
-        except Exception:
-            return Decimal("0"), Decimal("0")
-
-        gross = price * qty * (Decimal("1") - disc / Decimal("100"))
-        gross = gross.quantize(Decimal("0.01"))
-
-        # Calculate taxes from the item's tax rates
-        total_tax = Decimal("0")
-        taxes = item.get("taxes", [])
-        for tax_entry in taxes:
-            try:
-                rate = Decimal(tax_entry.get("rate", "0"))
-            except Exception:
-                continue
-            if rate > Decimal("0"):
-                # Price includes tax, so tax = gross * (rate / (100 + rate))
-                tax_amount = gross * rate / (Decimal("100") + rate)
-                tax_amount = tax_amount.quantize(Decimal("0.01"))
-                total_tax += tax_amount
-
-        total_tax = total_tax.quantize(Decimal("0.01"))
-        return gross, total_tax
+    def _enrich_with_totals(self, payload: dict) -> dict:
+        """Delegates to shared enrich_with_totals."""
+        from src.services.enrich import enrich_with_totals as _enrich
+        return _enrich(payload)
 
     # ──────────────────────────────────────────────────────────────────────────
     # PRIVATE — response helpers

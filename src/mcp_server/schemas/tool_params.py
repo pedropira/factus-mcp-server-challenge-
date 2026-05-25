@@ -586,9 +586,8 @@ class CreateCreditNoteParams(BaseModel):
     bill_number: str = Field(
         description="Número de factura que referencia (prefijo + consecutivo, ej: SETP990003791)",
     )
-    numbering_range_id: Optional[int] = Field(
-        default=None,
-        description="ID del rango de numeración (opcional, usa el default si no se envía)",
+    numbering_range_id: int = Field(
+        description="ID del rango de numeración en la base de datos local (es obligatorio para Factus API)",
     )
     payment_details: list[_PaymentDetail] = Field(
         description="Detalles de pago",

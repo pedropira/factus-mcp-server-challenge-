@@ -175,7 +175,7 @@ class CreditNoteCreate(SQLModel):
     observation: Optional[str] = Field(default=None, max_length=250)
     send_email: bool = Field(default=False)
     bill_number: str = Field(description="Número de factura que referencia (prefijo + consecutivo)")
-    numbering_range_id: Optional[int] = Field(default=None, description="ID del rango de numeración")
+    numbering_range_id: int = Field(description="ID del rango de numeración (obligatorio para Factus API)")
     payment_details: list[dict]
     customer: dict
     items: list[dict]
