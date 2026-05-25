@@ -9,7 +9,6 @@ for the full Colombian business flow.
 from __future__ import annotations
 
 import base64
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from src.mcp_server.schemas.tool_params import (
@@ -22,6 +21,7 @@ from src.mcp_server.schemas.tool_params import (
     GetInvoiceByReferenceParams,
     ListInvoicesParams,
 )
+from src.mcp_server.tools._shared import json_safe, item_to_factus
 from src.schemas.dto import InvoiceCreate
 from src.services.invoice_service import InvoiceService
 
@@ -29,18 +29,6 @@ if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
     from src.mcp_server.main import ServerDeps
-
-
-def _json_safe(d: dict) -> dict:
-    """Convert Decimal values to strings for JSON serialization."""
-    return {k: str(v) if isinstance(v, Decimal) else v for k, v in d.items()}
-
-
-def _item_to_factus(item: object) -> dict:
-    """Convert _InvoiceItemInput to Factus API item dict with taxes array."""
-    d = _json_safe(item.model_dump(exclude_none=True))
-    d["taxes"] = [{"rate": item.tax_rate}]
-    return d
 
 
 def register(server: FastMCP, deps: ServerDeps) -> None:

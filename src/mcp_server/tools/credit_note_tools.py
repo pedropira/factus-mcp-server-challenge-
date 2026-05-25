@@ -8,7 +8,6 @@ Credit notes use Factus-internal IDs for get/delete/download operations.
 from __future__ import annotations
 
 import base64
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from src.mcp_server.schemas.tool_params import (
@@ -19,6 +18,7 @@ from src.mcp_server.schemas.tool_params import (
     GetCreditNoteParams,
     ListCreditNotesParams,
 )
+from src.mcp_server.tools._shared import json_safe, item_to_factus
 from src.schemas.dto import CreditNoteCreate
 from src.services.credit_note_service import CreditNoteService
 
@@ -26,18 +26,6 @@ if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
     from src.mcp_server.main import ServerDeps
-
-
-def _json_safe(d: dict) -> dict:
-    """Convert Decimal values to strings for JSON serialization."""
-    return {k: str(v) if isinstance(v, Decimal) else v for k, v in d.items()}
-
-
-def _item_to_factus(item: object) -> dict:
-    """Convert _InvoiceItemInput to Factus API item dict with taxes array."""
-    d = _json_safe(item.model_dump(exclude_none=True))
-    d["taxes"] = [{"rate": item.tax_rate}]
-    return d
 
 
 def register(server: FastMCP, deps: ServerDeps) -> None:
@@ -60,10 +48,10 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 send_email=params.send_email,
                 invoice_reference=params.invoice_reference,
                 payment_details=[
-                    _json_safe(pd.model_dump()) for pd in params.payment_details
+                    json_safe(pd.model_dump()) for pd in params.payment_details
                 ],
                 customer=params.customer,
-                items=[_item_to_factus(i) for i in params.items],
+                items=[item_to_factus(i) for i in params.items],
             )
             result = await svc.create(data)
             return {"success": True, "data": result}

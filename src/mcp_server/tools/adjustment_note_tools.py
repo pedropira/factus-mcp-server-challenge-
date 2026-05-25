@@ -8,7 +8,6 @@ Adjustment notes use document numbers for get/download and reference_code for de
 from __future__ import annotations
 
 import base64
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from src.mcp_server.schemas.tool_params import (
@@ -19,6 +18,7 @@ from src.mcp_server.schemas.tool_params import (
     GetAdjustmentNoteParams,
     ListAdjustmentNotesParams,
 )
+from src.mcp_server.tools._shared import item_to_factus
 from src.schemas.dto import AdjustmentNoteCreate
 from src.services.adjustment_note_service import AdjustmentNoteService
 
@@ -26,18 +26,6 @@ if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
     from src.mcp_server.main import ServerDeps
-
-
-def _json_safe(d: dict) -> dict:
-    """Convert Decimal values to strings for JSON serialization."""
-    return {k: str(v) if isinstance(v, Decimal) else v for k, v in d.items()}
-
-
-def _item_to_factus(item: object) -> dict:
-    """Convert _InvoiceItemInput to Factus API item dict with taxes array."""
-    d = _json_safe(item.model_dump(exclude_none=True))
-    d["taxes"] = [{"rate": item.tax_rate}]
-    return d
 
 
 def register(server: FastMCP, deps: ServerDeps) -> None:
@@ -61,7 +49,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 correction_concept_code=params.correction_concept_code,
                 payment_details=params.payment_details,
                 provider=params.provider,
-                items=[_item_to_factus(i) for i in params.items],
+                items=[item_to_factus(i) for i in params.items],
                 observation=params.observation or "",
             )
             result = await svc.create(data)
