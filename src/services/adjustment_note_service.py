@@ -2,12 +2,12 @@
 AdjustmentNoteService — nota de ajuste de documento soporte vía Factus API.
 
 Endpoints:
-  - POST /v2/support-document-adjustment-notes/validate   — crear nota de ajuste
-  - GET  /v2/support-document-adjustment-notes            — listar notas de ajuste
-  - GET  /v2/support-document-adjustment-notes/{id}       — obtener por ID de Factus
-  - DELETE /v2/support-document-adjustment-notes/{id}     — eliminar
-  - GET  /v2/support-document-adjustment-notes/{id}/pdf   — descargar PDF
-  - GET  /v2/support-document-adjustment-notes/{id}/xml   — descargar XML
+  - POST /v2/adjustment-notes/validate                  — crear nota de ajuste
+  - GET  /v2/adjustment-notes                           — listar notas de ajuste
+  - GET  /v2/adjustment-notes/{number}                  — obtener por número de documento
+  - DELETE /v1/adjustment-notes/reference/{code}        — eliminar por reference_code
+  - GET  /v2/adjustment-notes/{number}/download-pdf     — descargar PDF
+  - GET  /v2/adjustment-notes/{number}/download-xml     — descargar XML
 """
 
 from __future__ import annotations
@@ -28,11 +28,11 @@ class AdjustmentNoteService:
         self._factus = factus
 
     # ──────────────────────────────────────────────────────────────────────────
-    # CREATE — POST /v2/support-document-adjustment-notes/validate
+    # CREATE — POST /v2/adjustment-notes/validate
     # ──────────────────────────────────────────────────────────────────────────
 
     async def create(self, data: AdjustmentNoteCreate) -> dict:
-        """Create and validate an adjustment note via POST /v2/.../validate.
+        """Create and validate an adjustment note via POST /v2/adjustment-notes/validate.
 
         Args:
             data: DTO con datos de la nota de ajuste.
@@ -43,18 +43,24 @@ class AdjustmentNoteService:
         Raises:
             FactusApiError: Si la API devuelve error.
         """
-        payload = {
+        payload: dict[str, Any] = {
             "reference_code": data.reference_code,
-            "document": data.document or "04",
-            "support_document_reference": data.support_document_reference,
+            "support_document_number": data.support_document_number,
+            "correction_concept_code": data.correction_concept_code,
+            "payment_details": data.payment_details,
             "provider": data.provider,
             "items": data.items,
             "observation": data.observation or "",
-            "send_email": data.send_email,
         }
+        if data.created_time is not None:
+            payload["created_time"] = data.created_time
+        if data.numbering_range_id is not None:
+            payload["numbering_range_id"] = data.numbering_range_id
+        if data.cash_rounding_amount is not None:
+            payload["cash_rounding_amount"] = data.cash_rounding_amount
 
         response = await self._factus.post(
-            "/v2/support-document-adjustment-notes/validate", json=payload
+            "/v2/adjustment-notes/validate", json=payload
         )
         await response.aread()
 
@@ -68,7 +74,7 @@ class AdjustmentNoteService:
         return response.json()
 
     # ──────────────────────────────────────────────────────────────────────────
-    # QUERY — GET /v2/support-document-adjustment-notes
+    # QUERY — GET /v2/adjustment-notes
     # ──────────────────────────────────────────────────────────────────────────
 
     async def list(
@@ -93,7 +99,7 @@ class AdjustmentNoteService:
             params[f"filter[{key}]"] = val
 
         response = await self._factus.get(
-            "/v2/support-document-adjustment-notes", params=params
+            "/v2/adjustment-notes", params=params
         )
         await response.aread()
 
@@ -106,17 +112,17 @@ class AdjustmentNoteService:
 
         return response.json()
 
-    async def get_by_id(self, factus_id: int) -> Optional[dict]:
-        """Get an adjustment note by its Factus-internal ID.
+    async def get_by_number(self, number: str) -> Optional[dict]:
+        """Get an adjustment note by its document number.
 
         Args:
-            factus_id: ID interno de Factus.
+            number: Número de documento de Factus.
 
         Returns:
             La nota de ajuste si existe, None si no.
         """
         response = await self._factus.get(
-            f"/v2/support-document-adjustment-notes/{factus_id}"
+            f"/v2/adjustment-notes/{number}"
         )
         await response.aread()
 
@@ -141,20 +147,20 @@ class AdjustmentNoteService:
             return None
 
     # ──────────────────────────────────────────────────────────────────────────
-    # DELETE — DELETE /v2/support-document-adjustment-notes/{id}
+    # DELETE — DELETE /v1/adjustment-notes/reference/{reference_code}
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def delete(self, factus_id: int) -> dict:
-        """Delete an adjustment note by its Factus-internal ID.
+    async def delete(self, reference_code: str) -> dict:
+        """Delete an adjustment note by its reference code.
 
         Args:
-            factus_id: ID interno de Factus de la nota a eliminar.
+            reference_code: Código de referencia de la nota a eliminar.
 
         Returns:
             Respuesta de Factus confirmando la eliminación.
         """
         response = await self._factus.delete(
-            f"/v2/support-document-adjustment-notes/{factus_id}"
+            f"/v1/adjustment-notes/reference/{reference_code}"
         )
         await response.aread()
 
@@ -171,17 +177,17 @@ class AdjustmentNoteService:
     # DOWNLOAD — PDF / XML
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def download_pdf(self, factus_id: int) -> httpx.Response:
+    async def download_pdf(self, number: str) -> httpx.Response:
         """Download the PDF representation of an adjustment note.
 
         Args:
-            factus_id: ID interno de Factus.
+            number: Número de documento de Factus.
 
         Returns:
             La respuesta HTTP con el contenido binario del PDF.
         """
         response = await self._factus.get(
-            f"/v2/support-document-adjustment-notes/{factus_id}/pdf"
+            f"/v2/adjustment-notes/{number}/download-pdf"
         )
         await response.aread()
 
@@ -194,17 +200,17 @@ class AdjustmentNoteService:
 
         return response
 
-    async def download_xml(self, factus_id: int) -> httpx.Response:
+    async def download_xml(self, number: str) -> httpx.Response:
         """Download the XML representation of an adjustment note.
 
         Args:
-            factus_id: ID interno de Factus.
+            number: Número de documento de Factus.
 
         Returns:
             La respuesta HTTP con el contenido XML.
         """
         response = await self._factus.get(
-            f"/v2/support-document-adjustment-notes/{factus_id}/xml"
+            f"/v2/adjustment-notes/{number}/download-xml"
         )
         await response.aread()
 

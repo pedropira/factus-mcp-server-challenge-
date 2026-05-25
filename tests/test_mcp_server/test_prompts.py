@@ -109,7 +109,7 @@ class TestPromptContent:
             ("crear-factura-guia", "search_customers"),
             ("crear-nota-credito-guia", "correction_concept_code"),
             ("crear-documento-soporte-guia", "create_support_document"),
-            ("crear-nota-ajuste-guia", "support_document_reference"),
+            ("crear-nota-ajuste-guia", "support_document_number"),
         ]
         for name, expected_reference in guide_names:
             result = await self._server.get_prompt(name)

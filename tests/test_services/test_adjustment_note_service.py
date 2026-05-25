@@ -2,12 +2,12 @@
 Tests for AdjustmentNoteService — notas de ajuste vía Factus API.
 
 Verifica:
-- Construcción correcta del payload para POST /v2/.../validate
+- Construcción correcta del payload para POST /v2/adjustment-notes/validate
 - Parseo de respuestas de Factus
 - Listado con filtros
-- Búsqueda por ID y reference_code
-- Eliminación por ID
-- Descarga de PDF/XML
+- Búsqueda por número de documento y reference_code
+- Eliminación por reference_code
+- Descarga de PDF/XML por número de documento
 - Manejo de errores HTTP
 """
 
@@ -42,7 +42,17 @@ def service(mock_factus: MagicMock) -> AdjustmentNoteService:
 def sample_create_data() -> AdjustmentNoteCreate:
     return AdjustmentNoteCreate(
         reference_code="AN-TEST-001",
-        support_document_reference="SD-TEST-001",
+        support_document_number="SD-TEST-001",
+        correction_concept_code="2",
+        payment_details=[
+            {
+                "payment_form": "1",
+                "payment_method_code": "42",
+                "reference_code": "pago-001",
+                "amount": "60000.00",
+                "due_date": "2025-01-01",
+            },
+        ],
         provider={
             "identification_document_code": "13",
             "identification": "222222222222",
@@ -77,7 +87,7 @@ def factus_success_response() -> httpx.Response:
             "message": "Nota de ajuste registrada y validada con exito",
             "data": {
                 "reference_code": "AN-TEST-001",
-                "id": 12345,
+                "number": "SEDS984000129",
                 "document_type": {"code": "04", "name": "Nota de Ajuste"},
                 "is_validated": True,
                 "validated_at": "21-05-2026 07:32:15 PM",
@@ -105,36 +115,93 @@ class TestAdjustmentNoteCreate:
         # Verify endpoint and payload
         mock_factus.post.assert_awaited_once()
         mock_factus.post.assert_awaited_once_with(
-            "/v2/support-document-adjustment-notes/validate",
+            "/v2/adjustment-notes/validate",
             json={
                 "reference_code": "AN-TEST-001",
-                "document": "04",
-                "support_document_reference": "SD-TEST-001",
+                "support_document_number": "SD-TEST-001",
+                "correction_concept_code": "2",
+                "payment_details": [
+                    {
+                        "payment_form": "1",
+                        "payment_method_code": "42",
+                        "reference_code": "pago-001",
+                        "amount": "60000.00",
+                        "due_date": "2025-01-01",
+                    },
+                ],
                 "provider": sample_create_data.provider,
                 "items": sample_create_data.items,
                 "observation": "",
-                "send_email": False,
             },
         )
 
         # Verify response
         assert result["status"] == "Created"
-        assert result["data"]["id"] == 12345
+        assert result["data"]["number"] == "SEDS984000129"
         assert result["data"]["is_validated"] is True
 
-    async def test_send_email_defaults_to_false(
+    async def test_observacion_defaults_to_empty_string(
         self,
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
         sample_create_data: AdjustmentNoteCreate,
         factus_success_response: httpx.Response,
     ) -> None:
-        """send_email debe ser False por defecto."""
+        """observation debe ser '' por defecto."""
         mock_factus.post.return_value = factus_success_response
         await service.create(sample_create_data)
 
         call_kwargs = mock_factus.post.await_args.kwargs
-        assert call_kwargs["json"]["send_email"] is False
+        assert call_kwargs["json"]["observation"] == ""
+
+    async def test_omits_optional_fields_when_none(
+        self,
+        service: AdjustmentNoteService,
+        mock_factus: MagicMock,
+        factus_success_response: httpx.Response,
+    ) -> None:
+        """created_time, numbering_range_id, cash_rounding_amount no se envian si son None."""
+        data = AdjustmentNoteCreate(
+            reference_code="AN-TEST-002",
+            support_document_number="SD-TEST-002",
+            correction_concept_code="1",
+            payment_details=[{"payment_form": "1", "payment_method_code": "10", "amount": "50000.00"}],
+            provider={"name": "test"},
+            items=[{"code_reference": "X", "name": "Y", "quantity": "1", "price": "100"}],
+        )
+        mock_factus.post.return_value = factus_success_response
+        await service.create(data)
+
+        payload = mock_factus.post.await_args.kwargs["json"]
+        assert "created_time" not in payload
+        assert "numbering_range_id" not in payload
+        assert "cash_rounding_amount" not in payload
+
+    async def test_includes_optional_fields_when_set(
+        self,
+        service: AdjustmentNoteService,
+        mock_factus: MagicMock,
+        factus_success_response: httpx.Response,
+    ) -> None:
+        """created_time, numbering_range_id, cash_rounding_amount se envian si tienen valor."""
+        data = AdjustmentNoteCreate(
+            reference_code="AN-TEST-003",
+            support_document_number="SD-TEST-003",
+            correction_concept_code="1",
+            payment_details=[{"payment_form": "1", "payment_method_code": "10", "amount": "50000.00"}],
+            provider={"name": "test"},
+            items=[{"code_reference": "X", "name": "Y", "quantity": "1", "price": "100"}],
+            created_time="15:30:00",
+            numbering_range_id=5,
+            cash_rounding_amount="0.50",
+        )
+        mock_factus.post.return_value = factus_success_response
+        await service.create(data)
+
+        payload = mock_factus.post.await_args.kwargs["json"]
+        assert payload["created_time"] == "15:30:00"
+        assert payload["numbering_range_id"] == 5
+        assert payload["cash_rounding_amount"] == "0.50"
 
     async def test_raises_on_factus_error(
         self,
@@ -147,7 +214,7 @@ class TestAdjustmentNoteCreate:
             422,
             json={
                 "message": "El documento soporte referenciado no existe",
-                "errors": [{"field": "support_document_reference", "detail": "Not found"}],
+                "errors": [{"field": "support_document_number", "detail": "Not found"}],
             },
         )
 
@@ -181,7 +248,7 @@ class TestAdjustmentNoteQueries:
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
     ) -> None:
-        """GET /v2/support-document-adjustment-notes con parametros."""
+        """GET /v2/adjustment-notes con parametros."""
         mock_factus.get.return_value = httpx.Response(
             200,
             json={
@@ -199,44 +266,44 @@ class TestAdjustmentNoteQueries:
         result = await service.list(limit=10, status="1")
 
         mock_factus.get.assert_awaited_once_with(
-            "/v2/support-document-adjustment-notes",
+            "/v2/adjustment-notes",
             params={"limit": 10, "offset": 0, "filter[status]": "1"},
         )
         assert len(result["data"]["data"]) == 2
 
-    async def test_get_by_id_found(
+    async def test_get_by_number_found(
         self,
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
     ) -> None:
-        """Buscar por ID -> encuentra."""
+        """Buscar por número -> encuentra."""
         mock_factus.get.return_value = httpx.Response(
             200,
             json={
                 "status": "OK",
                 "message": "Solicitud exitosa",
                 "data": {
-                    "id": 12345,
+                    "number": "SEDS984000129",
                     "reference_code": "AN-TEST-001",
                     "is_validated": True,
                 },
             },
         )
 
-        result = await service.get_by_id(12345)
+        result = await service.get_by_number("SEDS984000129")
         assert result is not None
-        assert result["data"]["id"] == 12345
+        assert result["data"]["number"] == "SEDS984000129"
         assert result["data"]["reference_code"] == "AN-TEST-001"
 
-    async def test_get_by_id_not_found(
+    async def test_get_by_number_not_found(
         self,
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
     ) -> None:
-        """Buscar por ID -> 404 -> None."""
+        """Buscar por número -> 404 -> None."""
         mock_factus.get.return_value = httpx.Response(404, json={"message": "Not found"})
 
-        result = await service.get_by_id(99999)
+        result = await service.get_by_number("NO-EXISTE")
         assert result is None
 
     async def test_get_by_reference_code_found(
@@ -282,7 +349,7 @@ class TestAdjustmentNoteDelete:
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
     ) -> None:
-        """DELETE /v2/support-document-adjustment-notes/{id} -> success."""
+        """DELETE /v1/adjustment-notes/reference/{code} -> success."""
         mock_factus.delete.return_value = httpx.Response(
             200,
             json={
@@ -292,10 +359,10 @@ class TestAdjustmentNoteDelete:
             },
         )
 
-        result = await service.delete(12345)
+        result = await service.delete("AN-TEST-001")
 
         mock_factus.delete.assert_awaited_once_with(
-            "/v2/support-document-adjustment-notes/12345"
+            "/v1/adjustment-notes/reference/AN-TEST-001"
         )
         assert result["status"] == "OK"
         assert result["data"]["id"] == 12345
@@ -309,7 +376,7 @@ class TestAdjustmentNoteDelete:
         mock_factus.delete.return_value = httpx.Response(404, json={"message": "Not found"})
 
         with pytest.raises(FactusApiError) as exc:
-            await service.delete(99999)
+            await service.delete("NO-EXISTE")
 
         assert exc.value.status_code == 404
 
@@ -323,17 +390,17 @@ class TestAdjustmentNoteDownload:
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
     ) -> None:
-        """GET /v2/support-document-adjustment-notes/{id}/pdf -> binary."""
+        """GET /v2/adjustment-notes/{number}/download-pdf -> binary."""
         mock_factus.get.return_value = httpx.Response(
             200,
             content=b"%PDF-1.4 mock pdf content",
             headers={"Content-Type": "application/pdf"},
         )
 
-        response = await service.download_pdf(12345)
+        response = await service.download_pdf("SEDS984000129")
 
         mock_factus.get.assert_awaited_once_with(
-            "/v2/support-document-adjustment-notes/12345/pdf"
+            "/v2/adjustment-notes/SEDS984000129/download-pdf"
         )
         assert response.status_code == 200
         assert response.content.startswith(b"%PDF-1.4")
@@ -343,17 +410,17 @@ class TestAdjustmentNoteDownload:
         service: AdjustmentNoteService,
         mock_factus: MagicMock,
     ) -> None:
-        """GET /v2/support-document-adjustment-notes/{id}/xml -> XML."""
+        """GET /v2/adjustment-notes/{number}/download-xml -> XML."""
         mock_factus.get.return_value = httpx.Response(
             200,
             content=b'<?xml version="1.0" encoding="UTF-8"?><document>...</document>',
             headers={"Content-Type": "application/xml"},
         )
 
-        response = await service.download_xml(12345)
+        response = await service.download_xml("SEDS984000129")
 
         mock_factus.get.assert_awaited_once_with(
-            "/v2/support-document-adjustment-notes/12345/xml"
+            "/v2/adjustment-notes/SEDS984000129/download-xml"
         )
         assert response.status_code == 200
         assert b"<?xml" in response.content

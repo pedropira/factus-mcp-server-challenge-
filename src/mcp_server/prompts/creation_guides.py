@@ -203,20 +203,21 @@ Usa la misma información del proveedor del documento original.
 
 Usa `create_adjustment_note` con:
 - `reference_code`: Código único interno para la nota de ajuste
-- `support_document_reference`: Número Factus del documento soporte que se corrige
+- `support_document_number`: Número Factus del documento soporte que se corrige
+- `correction_concept_code`: Código del motivo de corrección
+- `payment_details`: Array con al menos un medio de pago
 - `provider`: Datos del proveedor (misma estructura que en el documento soporte)
 - `items`: Items a ajustar
-- `send_email`: true/false
 
 ## 3. Verificación
 
 Usa `list_adjustment_notes` con filtro `reference_code`.
-Usa `get_adjustment_note` con el `factus_id` (ID interno de Factus).
+Usa `get_adjustment_note` con el `number` (número de documento Factus).
 Usa `download_adjustment_note_pdf` para descargar el PDF.
 
 ## ⚠️ Nota Importante
-Las notas de ajuste usan `factus_id` (ID interno de Factus) para get/delete/download.
-NO usan el número de documento. Obtén el `factus_id` de la respuesta al crear o de `list_adjustment_notes`.
+Las notas de ajuste usan el **número de documento** de Factus para get/download.
+Para eliminar, usan el `reference_code`. Obtén ambos de la respuesta al crear o de `list_adjustment_notes`.
 """
 
 

@@ -2,7 +2,7 @@
 MCP tools for adjustment note (Nota de Ajuste) operations via Factus API.
 
 All tools use FactusClient directly (no local DB).
-Adjustment notes use Factus-internal IDs for get/delete/download operations.
+Adjustment notes use document numbers for get/download and reference_code for delete.
 """
 
 from __future__ import annotations
@@ -51,17 +51,18 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         """Create an adjustment note (Nota de Ajuste) via Factus API.
 
         Adjustment notes (type "04") correct existing support documents.
-        The support_document_reference is the Factus-assigned number of
+        The support_document_number is the Factus-assigned number of
         the document being corrected.
         """
         try:
             data = AdjustmentNoteCreate(
                 reference_code=params.reference_code,
-                support_document_reference=params.support_document_reference,
+                support_document_number=params.support_document_number,
+                correction_concept_code=params.correction_concept_code,
+                payment_details=params.payment_details,
                 provider=params.provider,
                 items=[_item_to_factus(i) for i in params.items],
                 observation=params.observation or "",
-                send_email=params.send_email,
             )
             result = await svc.create(data)
             return {"success": True, "data": result}
@@ -75,7 +76,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         """List adjustment notes from Factus API with optional filters.
 
         Filters: status, reference_code. Pagination via offset/limit (max 100).
-        The response includes factus_id values for get/delete/download tools.
+        The response includes document numbers for get/download tools.
         """
         try:
             filters: dict[str, str] = {}
@@ -94,16 +95,16 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
 
     @server.tool()
     async def get_adjustment_note(params: GetAdjustmentNoteParams) -> dict:
-        """Get an adjustment note by its Factus-internal ID.
+        """Get an adjustment note by its document number.
 
-        Use the factus_id returned by list_adjustment_notes.
+        Use the number returned by list_adjustment_notes.
         """
         try:
-            result = await svc.get_by_id(params.factus_id)
+            result = await svc.get_by_number(params.number)
             if result is None:
                 return {
                     "success": False,
-                    "error": f"Adjustment note with factus_id {params.factus_id} not found",
+                    "error": f"Adjustment note with number {params.number} not found",
                 }
             return {"success": True, "data": result}
         except Exception as e:
@@ -113,12 +114,12 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
     async def delete_adjustment_note(
         params: DeleteAdjustmentNoteParams,
     ) -> dict:
-        """Delete an adjustment note by its Factus-internal ID.
+        """Delete an adjustment note by its reference code.
 
         Permanently removes the adjustment note from Factus. Use with caution.
         """
         try:
-            result = await svc.delete(params.factus_id)
+            result = await svc.delete(params.reference_code)
             return {"success": True, "data": result}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -127,12 +128,12 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
     async def download_adjustment_note_pdf(
         params: DownloadAdjustmentNotePdfParams,
     ) -> dict:
-        """Download an adjustment note PDF by its Factus-internal ID.
+        """Download an adjustment note PDF by its document number.
 
         Returns base64-encoded PDF content.
         """
         try:
-            response = await svc.download_pdf(params.factus_id)
+            response = await svc.download_pdf(params.number)
             content = base64.b64encode(response.content).decode()
             return {
                 "success": True,
@@ -141,7 +142,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                     "content_type": response.headers.get(
                         "content-type", "application/pdf"
                     ),
-                    "filename": f"adjustment_note_{params.factus_id}.pdf",
+                    "filename": f"adjustment_note_{params.number}.pdf",
                 },
             }
         except Exception as e:
@@ -151,12 +152,12 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
     async def download_adjustment_note_xml(
         params: DownloadAdjustmentNoteXmlParams,
     ) -> dict:
-        """Download an adjustment note XML by its Factus-internal ID.
+        """Download an adjustment note XML by its document number.
 
         Returns base64-encoded XML content.
         """
         try:
-            response = await svc.download_xml(params.factus_id)
+            response = await svc.download_xml(params.number)
             content = base64.b64encode(response.content).decode()
             return {
                 "success": True,
@@ -165,7 +166,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                     "content_type": response.headers.get(
                         "content-type", "application/xml"
                     ),
-                    "filename": f"adjustment_note_{params.factus_id}.xml",
+                    "filename": f"adjustment_note_{params.number}.xml",
                 },
             }
         except Exception as e:

@@ -21,24 +21,30 @@ from sqlmodel import Field, SQLModel
 class CustomerCreate(SQLModel):
     identification_document_id: int
     identification: str = Field(max_length=50)
-    dv: Optional[str] = Field(default=None, max_length=1)
+    dv: Optional[str] = Field(default=None, max_length=2)
     company: Optional[str] = Field(default=None, max_length=200)
+    trade_name: Optional[str] = Field(default=None, max_length=200)
     names: Optional[str] = Field(default=None, max_length=200)
     email: Optional[str] = Field(default=None, max_length=200)
     phone: Optional[str] = Field(default=None, max_length=50)
     address: Optional[str] = Field(default=None, max_length=200)
+    legal_organization_id: Optional[str] = Field(default=None, max_length=5)
+    tribute_id: Optional[str] = Field(default=None, max_length=5)
     municipality_id: Optional[str] = Field(default=None, max_length=10)
 
 
 class CustomerUpdate(SQLModel):
     identification_document_id: Optional[int] = None
     identification: Optional[str] = Field(default=None, max_length=50)
-    dv: Optional[str] = Field(default=None, max_length=1)
+    dv: Optional[str] = Field(default=None, max_length=2)
     company: Optional[str] = Field(default=None, max_length=200)
+    trade_name: Optional[str] = Field(default=None, max_length=200)
     names: Optional[str] = Field(default=None, max_length=200)
     email: Optional[str] = Field(default=None, max_length=200)
     phone: Optional[str] = Field(default=None, max_length=50)
     address: Optional[str] = Field(default=None, max_length=200)
+    legal_organization_id: Optional[str] = Field(default=None, max_length=5)
+    tribute_id: Optional[str] = Field(default=None, max_length=5)
     municipality_id: Optional[str] = Field(default=None, max_length=10)
 
 
@@ -49,13 +55,17 @@ class CustomerUpdate(SQLModel):
 
 class EstablishmentCreate(SQLModel):
     name: str = Field(max_length=200)
-    address: Optional[str] = Field(default=None, max_length=200)
-    municipality_id: Optional[str] = Field(default=None, max_length=10)
+    address: str = Field(max_length=200)
+    phone_number: Optional[str] = Field(default=None, max_length=50)
+    email: Optional[str] = Field(default=None, max_length=200)
+    municipality_id: str = Field(max_length=10)
 
 
 class EstablishmentUpdate(SQLModel):
     name: Optional[str] = Field(default=None, max_length=200)
     address: Optional[str] = Field(default=None, max_length=200)
+    phone_number: Optional[str] = Field(default=None, max_length=50)
+    email: Optional[str] = Field(default=None, max_length=200)
     municipality_id: Optional[str] = Field(default=None, max_length=10)
 
 
@@ -65,18 +75,26 @@ class EstablishmentUpdate(SQLModel):
 
 
 class NumberingRangeCreate(SQLModel):
-    document_type_id: int
     prefix: str = Field(max_length=10)
     from_number: int
     to_number: int
+    resolution_number: str = Field(max_length=50)
+    start_date: str = Field(max_length=10)
+    end_date: str = Field(max_length=10)
+    months: int
+    document_type_id: str = Field(max_length=5)
     is_active: bool = True
 
 
 class NumberingRangeUpdate(SQLModel):
-    document_type_id: Optional[int] = None
     prefix: Optional[str] = Field(default=None, max_length=10)
     from_number: Optional[int] = None
     to_number: Optional[int] = None
+    resolution_number: Optional[str] = Field(default=None, max_length=50)
+    start_date: Optional[str] = Field(default=None, max_length=10)
+    end_date: Optional[str] = Field(default=None, max_length=10)
+    months: Optional[int] = None
+    document_type_id: Optional[str] = Field(default=None, max_length=5)
     is_active: Optional[bool] = None
 
 
@@ -193,7 +211,7 @@ class SupportDocumentCreate(SQLModel):
 
 
 class AdjustmentNoteCreate(SQLModel):
-    """DTO para crear una nota de ajuste vía POST /v2/support-document-adjustment-notes/validate.
+    """DTO para crear una nota de ajuste vía POST /v2/adjustment-notes/validate.
 
     Las notas de ajuste (type "04") corrigen documentos soporte existentes.
     """
@@ -201,13 +219,24 @@ class AdjustmentNoteCreate(SQLModel):
     reference_code: str = Field(
         max_length=100, description="Código único del documento"
     )
-    document: str = Field(
-        default="04", description="Tipo de documento (04=nota de ajuste)"
-    )
-    support_document_reference: str = Field(
+    support_document_number: str = Field(
         description="Número de documento soporte que referencia"
+    )
+    correction_concept_code: str = Field(
+        description="Código del concepto de corrección (obligatorio)"
+    )
+    payment_details: list[dict] = Field(
+        description="Medios de pago (array, al menos uno)"
     )
     provider: dict = Field(description="Datos del proveedor")
     items: list[dict] = Field(description="Ítems de la nota de ajuste")
+    created_time: Optional[str] = Field(
+        default=None, description="Hora de creación (HH:mm:ss)"
+    )
+    numbering_range_id: Optional[int] = Field(
+        default=None, description="ID del rango de numeración"
+    )
+    cash_rounding_amount: Optional[str] = Field(
+        default=None, description="Redondeo de caja"
+    )
     observation: Optional[str] = Field(default=None, max_length=250)
-    send_email: bool = Field(default=False)

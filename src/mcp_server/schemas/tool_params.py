@@ -31,7 +31,7 @@ class CreateCustomerParams(BaseModel):
         max_length=50, description="Número de identificación del cliente"
     )
     dv: Optional[str] = Field(
-        default=None, max_length=1,
+        default=None, max_length=2,
         description="Dígito de verificación (requerido si NIT)",
     )
     company: Optional[str] = Field(
@@ -94,7 +94,7 @@ class UpdateCustomerParams(BaseModel):
         default=None, max_length=50, description="Número de identificación",
     )
     dv: Optional[str] = Field(
-        default=None, max_length=1, description="Dígito de verificación",
+        default=None, max_length=2, description="Dígito de verificación",
     )
     company: Optional[str] = Field(
         default=None, max_length=200, description="Razón social",
@@ -306,22 +306,33 @@ class DeleteEstablishmentParams(BaseModel):
 class CreateNumberingRangeParams(BaseModel):
     """Register a new DIAN numbering range in the local database."""
 
-    document_type_id: int = Field(
-        description="Tipo de documento (21=factura, 22=nota crédito, 24=doc. soporte)",
-    )
     prefix: str = Field(
         max_length=10, description="Prefijo del rango (ej: SETP, FAC)",
     )
     from_number: int = Field(description="Número inicial del rango")
     to_number: int = Field(description="Número final del rango")
+    resolution_number: str = Field(
+        max_length=50, description="Número de resolución DIAN",
+    )
+    start_date: str = Field(
+        max_length=10, description="Fecha inicio de vigencia (DD-MM-YYYY)",
+    )
+    end_date: str = Field(
+        max_length=10, description="Fecha fin de vigencia (DD-MM-YYYY)",
+    )
+    months: int = Field(description="Meses de vigencia")
+    document_type_id: str = Field(
+        max_length=5,
+        description="Tipo de documento (21=factura, 22=nota crédito, 24=doc. soporte)",
+    )
     is_active: bool = Field(default=True, description="Si el rango está activo")
 
 
 class GetActiveNumberingRangesParams(BaseModel):
     """Get all active numbering ranges, optionally filtered by document type."""
 
-    document_type_id: Optional[int] = Field(
-        default=None,
+    document_type_id: Optional[str] = Field(
+        default=None, max_length=5,
         description="Filtrar por tipo de documento (opcional: 21=factura, 22=NC, 24=DS)",
     )
 
@@ -329,7 +340,8 @@ class GetActiveNumberingRangesParams(BaseModel):
 class GetDefaultNumberingRangeParams(BaseModel):
     """Get the first active numbering range for a document type."""
 
-    document_type_id: int = Field(
+    document_type_id: str = Field(
+        max_length=5,
         description="Tipo de documento (21=factura, 22=nota crédito, 24=doc. soporte)",
     )
 
@@ -588,32 +600,32 @@ class ListCreditNotesParams(BaseModel):
 class GetCreditNoteParams(BaseModel):
     """Get a credit note by its Factus-internal ID."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota crédito en Factus (devuelto por list_credit_notes)",
+    factus_id: str = Field(
+        min_length=1, description="ID interno de la nota crédito en Factus (devuelto por list_credit_notes)",
     )
 
 
 class DeleteCreditNoteParams(BaseModel):
     """Delete a credit note by its Factus-internal ID."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota crédito en Factus",
+    factus_id: str = Field(
+        min_length=1, description="ID interno de la nota crédito en Factus",
     )
 
 
 class DownloadCreditNotePdfParams(BaseModel):
     """Download a credit note PDF by its Factus-internal ID."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota crédito en Factus",
+    factus_id: str = Field(
+        min_length=1, description="ID interno de la nota crédito en Factus",
     )
 
 
 class DownloadCreditNoteXmlParams(BaseModel):
     """Download a credit note XML by its Factus-internal ID."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota crédito en Factus",
+    factus_id: str = Field(
+        min_length=1, description="ID interno de la nota crédito en Factus",
     )
 
 
@@ -703,8 +715,14 @@ class CreateAdjustmentNoteParams(BaseModel):
     reference_code: str = Field(
         max_length=100, description="Código único de referencia",
     )
-    support_document_reference: str = Field(
+    support_document_number: str = Field(
         description="Número de documento soporte que referencia",
+    )
+    correction_concept_code: str = Field(
+        description="Código del concepto de corrección (obligatorio en Factus)",
+    )
+    payment_details: list[dict] = Field(
+        description="Medios de pago (array, al menos uno requerido)",
     )
     provider: dict = Field(
         description="Datos del proveedor en formato Factus API",
@@ -714,9 +732,6 @@ class CreateAdjustmentNoteParams(BaseModel):
     )
     observation: Optional[str] = Field(
         default=None, max_length=250, description="Observación (max 250 chars)",
-    )
-    send_email: bool = Field(
-        default=False, description="Enviar correo al proveedor",
     )
 
 
@@ -732,34 +747,34 @@ class ListAdjustmentNotesParams(BaseModel):
 
 
 class GetAdjustmentNoteParams(BaseModel):
-    """Get an adjustment note by its Factus-internal ID."""
+    """Get an adjustment note by its document number."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota de ajuste en Factus (devuelto por list_adjustment_notes)",
+    number: str = Field(
+        min_length=1, description="Número de documento de Factus (devuelto por list_adjustment_notes)",
     )
 
 
 class DeleteAdjustmentNoteParams(BaseModel):
-    """Delete an adjustment note by its Factus-internal ID."""
+    """Delete an adjustment note by its reference code."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota de ajuste en Factus",
+    reference_code: str = Field(
+        min_length=1, description="Código de referencia (reference_code) de la nota a eliminar",
     )
 
 
 class DownloadAdjustmentNotePdfParams(BaseModel):
-    """Download an adjustment note PDF by its Factus-internal ID."""
+    """Download an adjustment note PDF by its document number."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota de ajuste en Factus",
+    number: str = Field(
+        min_length=1, description="Número de documento de Factus",
     )
 
 
 class DownloadAdjustmentNoteXmlParams(BaseModel):
-    """Download an adjustment note XML by its Factus-internal ID."""
+    """Download an adjustment note XML by its document number."""
 
-    factus_id: int = Field(
-        description="ID interno de la nota de ajuste en Factus",
+    number: str = Field(
+        min_length=1, description="Número de documento de Factus",
     )
 
 
