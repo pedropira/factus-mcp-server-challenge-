@@ -19,6 +19,7 @@ import httpx
 from src.infrastructure.factus_client import FactusClient
 from src.schemas.dto import AdjustmentNoteCreate
 from src.services.invoice_service import FactusApiError
+from src.services.mappers import provider_to_factus_dict
 
 
 class AdjustmentNoteService:
@@ -48,7 +49,7 @@ class AdjustmentNoteService:
             "support_document_number": data.support_document_number,
             "correction_concept_code": data.correction_concept_code,
             "payment_details": data.payment_details,
-            "provider": data.provider,
+            "provider": provider_to_factus_dict(data.provider),
             "items": data.items,
             "observation": data.observation or "",
         }
@@ -177,14 +178,14 @@ class AdjustmentNoteService:
     # DOWNLOAD — PDF / XML
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def download_pdf(self, number: str) -> httpx.Response:
+    async def download_pdf(self, number: str) -> dict:
         """Download the PDF representation of an adjustment note.
 
         Args:
             number: Número de documento de Factus.
 
         Returns:
-            La respuesta HTTP con el contenido binario del PDF.
+            Dict con pdf_base_64_encoded y filename.
         """
         response = await self._factus.get(
             f"/v2/adjustment-notes/{number}/download-pdf"
@@ -198,16 +199,16 @@ class AdjustmentNoteService:
                 body=self._safe_body(response),
             )
 
-        return response
+        return response.json()
 
-    async def download_xml(self, number: str) -> httpx.Response:
+    async def download_xml(self, number: str) -> dict:
         """Download the XML representation of an adjustment note.
 
         Args:
             number: Número de documento de Factus.
 
         Returns:
-            La respuesta HTTP con el contenido XML.
+            Dict con xml_base_64_encoded y filename.
         """
         response = await self._factus.get(
             f"/v2/adjustment-notes/{number}/download-xml"
@@ -221,7 +222,7 @@ class AdjustmentNoteService:
                 body=self._safe_body(response),
             )
 
-        return response
+        return response.json()
 
     # ──────────────────────────────────────────────────────────────────────────
     # PRIVATE

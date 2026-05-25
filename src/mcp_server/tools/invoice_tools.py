@@ -8,7 +8,6 @@ for the full Colombian business flow.
 
 from __future__ import annotations
 
-import base64
 from typing import TYPE_CHECKING
 
 from src.mcp_server.schemas.tool_params import (
@@ -21,7 +20,7 @@ from src.mcp_server.schemas.tool_params import (
     GetInvoiceByReferenceParams,
     ListInvoicesParams,
 )
-from src.mcp_server.tools._shared import json_safe, item_to_factus
+from src.mcp_server.tools._shared import error_body, json_safe, item_to_factus as _item_to_factus
 from src.schemas.dto import InvoiceCreate
 from src.services.invoice_service import InvoiceService
 
@@ -51,12 +50,12 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 observation=params.observation or "",
                 send_email=params.send_email,
                 payment_details=[
-                    _json_safe(pd.model_dump()) for pd in params.payment_details
+                    json_safe(pd.model_dump()) for pd in params.payment_details
                 ],
                 customer=params.customer,
                 items=[_item_to_factus(i) for i in params.items],
                 allowance_charges=[
-                    _json_safe(ac.model_dump()) for ac in params.allowance_charges
+                    json_safe(ac.model_dump()) for ac in params.allowance_charges
                 ]
                 if params.allowance_charges
                 else None,
@@ -64,7 +63,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             result = await invoice_svc.create(data)
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def create_invoice_with_numbering(
@@ -113,13 +112,13 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                     observation=params.observation or "",
                     send_email=params.send_email,
                     payment_details=[
-                        _json_safe(pd.model_dump())
+                        json_safe(pd.model_dump())
                         for pd in params.payment_details
                     ],
                     customer={},
                     items=[_item_to_factus(i) for i in params.items],
                     allowance_charges=[
-                        _json_safe(ac.model_dump())
+                        json_safe(ac.model_dump())
                         for ac in params.allowance_charges
                     ]
                     if params.allowance_charges
@@ -136,7 +135,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 )
                 return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def list_invoices(params: ListInvoicesParams) -> dict:
@@ -157,7 +156,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             )
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def get_invoice_by_number(params: GetInvoiceByNumberParams) -> dict:
@@ -175,7 +174,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 }
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def get_invoice_by_reference(
@@ -196,7 +195,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 }
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def delete_invoice(params: DeleteInvoiceParams) -> dict:
@@ -208,7 +207,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             result = await invoice_svc.delete(params.reference_code)
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def download_invoice_pdf(params: DownloadInvoicePdfParams) -> dict:
@@ -217,20 +216,16 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         Returns base64-encoded PDF content.
         """
         try:
-            response = await invoice_svc.download_pdf(params.number)
-            content = base64.b64encode(response.content).decode()
+            data = await invoice_svc.download_pdf(params.number)
             return {
                 "success": True,
                 "data": {
-                    "content": content,
-                    "content_type": response.headers.get(
-                        "content-type", "application/pdf"
-                    ),
-                    "filename": f"invoice_{params.number}.pdf",
+                    "content": data.get("pdf_base_64_encoded", ""),
+                    "filename": data.get("name", f"invoice_{params.number}.pdf"),
                 },
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def download_invoice_xml(params: DownloadInvoiceXmlParams) -> dict:
@@ -239,20 +234,16 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         Returns base64-encoded XML content.
         """
         try:
-            response = await invoice_svc.download_xml(params.number)
-            content = base64.b64encode(response.content).decode()
+            data = await invoice_svc.download_xml(params.number)
             return {
                 "success": True,
                 "data": {
-                    "content": content,
-                    "content_type": response.headers.get(
-                        "content-type", "application/xml"
-                    ),
-                    "filename": f"invoice_{params.number}.xml",
+                    "content": data.get("xml_base_64_encoded", ""),
+                    "filename": data.get("name", f"invoice_{params.number}.xml"),
                 },
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
 
 __all__ = ["register"]

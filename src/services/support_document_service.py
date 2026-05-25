@@ -19,6 +19,7 @@ import httpx
 from src.infrastructure.factus_client import FactusClient
 from src.schemas.dto import SupportDocumentCreate
 from src.services.invoice_service import FactusApiError
+from src.services.mappers import provider_to_factus_dict
 
 
 class SupportDocumentService:
@@ -46,7 +47,7 @@ class SupportDocumentService:
         payload = {
             "reference_code": data.reference_code,
             "document": data.document or "03",
-            "provider": data.provider,
+            "provider": provider_to_factus_dict(data.provider),
             "items": data.items,
             "observation": data.observation or "",
             "send_email": data.send_email,
@@ -164,16 +165,16 @@ class SupportDocumentService:
     # DOWNLOAD — PDF / XML
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def download_pdf(self, number: str) -> httpx.Response:
+    async def download_pdf(self, number: str) -> dict:
         """Download the PDF representation of a support document.
 
         Args:
             number: Número del documento asignado por Factus.
 
         Returns:
-            La respuesta HTTP con el contenido binario del PDF.
+            Dict con pdf_base_64_encoded y filename.
         """
-        response = await self._factus.get(f"/v2/support-documents/{number}/pdf")
+        response = await self._factus.get(f"/v2/support-documents/{number}/download-pdf")
         await response.aread()
 
         if not response.is_success:
@@ -183,18 +184,18 @@ class SupportDocumentService:
                 body=self._safe_body(response),
             )
 
-        return response
+        return response.json()
 
-    async def download_xml(self, number: str) -> httpx.Response:
+    async def download_xml(self, number: str) -> dict:
         """Download the XML representation of a support document.
 
         Args:
             number: Número del documento asignado por Factus.
 
         Returns:
-            La respuesta HTTP con el contenido XML.
+            Dict con xml_base_64_encoded y filename.
         """
-        response = await self._factus.get(f"/v2/support-documents/{number}/xml")
+        response = await self._factus.get(f"/v2/support-documents/{number}/download-xml")
         await response.aread()
 
         if not response.is_success:
@@ -204,7 +205,7 @@ class SupportDocumentService:
                 body=self._safe_body(response),
             )
 
-        return response
+        return response.json()
 
     # ──────────────────────────────────────────────────────────────────────────
     # PRIVATE

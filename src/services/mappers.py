@@ -77,11 +77,12 @@ UNIT_MEASURE_MAP: dict[int, str] = {
 }
 
 # Factus standard_code_id → DIAN standard_code
+# IMPORTANTE: DIAN usa "999" para "Estándar de adopción del contribuyente"
 STANDARD_CODE_MAP: dict[int, str] = {
-    1: "1",   # Estándar del contribuyente
-    2: "2",   # UNSPSC
-    3: "3",   # Partida arancelaria
-    4: "4",   # GTIN
+    1: "999",  # Estándar de adopción del contribuyente
+    2: "2",    # UNSPSC
+    3: "3",    # Partida arancelaria
+    4: "4",    # GTIN
 }
 
 # Factus item_tribute_id → DIAN tax code
@@ -132,6 +133,83 @@ def customer_to_factus_dict(
     }
 
     # Remove empty/None values to keep payload clean
+    return _clean_dict(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Provider (raw dict) → Factus dict
+# ═══════════════════════════════════════════════════════════════════════════
+# Support documents and adjustment notes accept a raw ``provider`` dict from
+# the MCP tool. The LLM may pass Factus API fields (``identification_document_code``)
+# OR user-friendly fields (``identification_document_id``). This mapper handles
+# both and fills missing required fields with sensible defaults.
+#
+# Accepted field formats:
+#   - ``identification_document_id`` (int)   → ``identification_document_code`` (str)
+#   - ``identification_document_code`` (str) → passed through
+#   - ``legal_organization_id`` (str)        → ``legal_organization_code`` (str)
+#   - ``tribute_id`` (str)                   → ``tribute_code`` (str)
+#   - ``municipality_id`` (str)              → ``municipality_code`` (str)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def provider_to_factus_dict(provider: dict) -> dict[str, Any]:
+    """Convert a raw provider dict to Factus API format.
+
+    Accepts both user-friendly fields (``identification_document_id``)
+    and Factus API fields (``identification_document_code``). Missing
+    required fields are filled with sensible defaults so the Factus API
+    has a valid payload.
+
+    Args:
+        provider: Raw provider dict from the MCP tool.
+
+    Returns:
+        Dict ready to use as the ``provider`` field in Factus API requests.
+    """
+    result: dict[str, Any] = {}
+
+    # ── identification_document ──
+    if "identification_document_code" in provider:
+        result["identification_document_code"] = provider["identification_document_code"]
+    elif "identification_document_id" in provider:
+        result["identification_document_code"] = _map_identification_document_id(
+            provider["identification_document_id"]
+        )
+    else:
+        result["identification_document_code"] = "13"  # CC por defecto
+
+    # ── Pass-through fields ──
+    for field in ("identification", "dv", "company", "trade_name", "names",
+                  "address", "email", "phone"):
+        result[field] = provider.get(field, "")
+
+    # ── legal_organization ──
+    if "legal_organization_code" in provider:
+        result["legal_organization_code"] = provider["legal_organization_code"]
+    elif "legal_organization_id" in provider:
+        result["legal_organization_code"] = _map_legal_organization_id(
+            provider["legal_organization_id"]
+        )
+    else:
+        result["legal_organization_code"] = "2"  # Persona Natural por defecto
+
+    # ── tribute ──
+    if "tribute_code" in provider:
+        result["tribute_code"] = provider["tribute_code"]
+    elif "tribute_id" in provider:
+        result["tribute_code"] = _map_tribute_id(provider["tribute_id"])
+    else:
+        result["tribute_code"] = "ZZ"  # No aplica por defecto
+
+    # ── municipality ──
+    if "municipality_code" in provider:
+        result["municipality_code"] = provider["municipality_code"]
+    elif "municipality_id" in provider:
+        result["municipality_code"] = provider["municipality_id"]
+    else:
+        result["municipality_code"] = "11001"  # Bogotá por defecto
+
     return _clean_dict(result)
 
 
@@ -259,9 +337,9 @@ def _map_standard_code_id(factus_id: int) -> str:
 
     Returns:
         DIAN standard code.
-        Falls back to "1" (Estándar del contribuyente) if unknown.
+        Falls back to "999" (Estándar de adopción del contribuyente) if unknown.
     """
-    return STANDARD_CODE_MAP.get(factus_id, "1")
+    return STANDARD_CODE_MAP.get(factus_id, "999")
 
 
 def _map_item_tribute_to_tax_code(tribute_id: int) -> str:

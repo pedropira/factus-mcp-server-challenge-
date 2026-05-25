@@ -7,7 +7,6 @@ Credit notes use Factus-internal IDs for get/delete/download operations.
 
 from __future__ import annotations
 
-import base64
 from typing import TYPE_CHECKING
 
 from src.mcp_server.schemas.tool_params import (
@@ -18,7 +17,7 @@ from src.mcp_server.schemas.tool_params import (
     GetCreditNoteParams,
     ListCreditNotesParams,
 )
-from src.mcp_server.tools._shared import json_safe, item_to_factus
+from src.mcp_server.tools._shared import error_body, json_safe, item_to_factus
 from src.schemas.dto import CreditNoteCreate
 from src.services.credit_note_service import CreditNoteService
 
@@ -56,7 +55,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             result = await svc.create(data)
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def list_credit_notes(params: ListCreditNotesParams) -> dict:
@@ -78,7 +77,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             )
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def get_credit_note(params: GetCreditNoteParams) -> dict:
@@ -96,7 +95,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 }
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def delete_credit_note(params: DeleteCreditNoteParams) -> dict:
@@ -108,55 +107,47 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             result = await svc.delete(params.factus_id)
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def download_credit_note_pdf(
         params: DownloadCreditNotePdfParams,
     ) -> dict:
-        """Download a credit note PDF by its Factus-internal ID.
+        """Download a credit note PDF by its Factus-assigned number.
 
         Returns base64-encoded PDF content.
         """
         try:
-            response = await svc.download_pdf(params.factus_id)
-            content = base64.b64encode(response.content).decode()
+            data = await svc.download_pdf(params.number)
             return {
                 "success": True,
                 "data": {
-                    "content": content,
-                    "content_type": response.headers.get(
-                        "content-type", "application/pdf"
-                    ),
-                    "filename": f"credit_note_{params.factus_id}.pdf",
+                    "content": data.get("pdf_base_64_encoded", ""),
+                    "filename": data.get("name", f"credit_note_{params.number}.pdf"),
                 },
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def download_credit_note_xml(
         params: DownloadCreditNoteXmlParams,
     ) -> dict:
-        """Download a credit note XML by its Factus-internal ID.
+        """Download a credit note XML by its Factus-assigned number.
 
         Returns base64-encoded XML content.
         """
         try:
-            response = await svc.download_xml(params.factus_id)
-            content = base64.b64encode(response.content).decode()
+            data = await svc.download_xml(params.number)
             return {
                 "success": True,
                 "data": {
-                    "content": content,
-                    "content_type": response.headers.get(
-                        "content-type", "application/xml"
-                    ),
-                    "filename": f"credit_note_{params.factus_id}.xml",
+                    "content": data.get("xml_base_64_encoded", ""),
+                    "filename": data.get("name", f"credit_note_{params.number}.xml"),
                 },
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
 
 __all__ = ["register"]

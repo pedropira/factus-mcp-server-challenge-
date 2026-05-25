@@ -158,7 +158,7 @@ class TestProductToFactusDict:
         assert result["price"] == "2500000.00"
         assert result["discount_rate"] == "0.00"
         assert result["unit_measure_code"] == "94"  # Unidad DIAN code
-        assert result["standard_code"] == "1"
+        assert result["standard_code"] == "999"
         assert result["is_excluded"] == "false"
         assert result["total_discount"] == "0.00"
         assert result["taxes"] == [{"code": "01", "rate": "19.00"}]
@@ -247,9 +247,9 @@ class TestMappingHelpers:
         assert _map_unit_measure_id(999) == "94"  # Fallback
 
     def test_standard_code_map(self) -> None:
-        assert _map_standard_code_id(1) == "1"  # Estándar del contribuyente
+        assert _map_standard_code_id(1) == "999"  # Estándar de adopción del contribuyente
         assert _map_standard_code_id(2) == "2"  # UNSPSC
-        assert _map_standard_code_id(999) == "1"  # Fallback
+        assert _map_standard_code_id(999) == "999"  # Fallback
 
     def test_item_tribute_to_tax_code(self) -> None:
         assert _map_item_tribute_to_tax_code(1) == "01"  # IVA

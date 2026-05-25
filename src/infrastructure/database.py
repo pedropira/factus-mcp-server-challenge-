@@ -17,6 +17,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Optional
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -38,7 +39,21 @@ def get_engine(settings: Optional[Settings] = None) -> AsyncEngine:
         _engine = create_async_engine(
             db_url,
             echo=False,  # Cambiar a True para debug SQL
+            connect_args={
+                "timeout": 15,  # Esperar 15s por lock antes de fallar
+                "check_same_thread": False,  # Necesario para uso async
+            },
+            pool_pre_ping=True,  # Verificar conexion antes de usar
         )
+
+        # Configurar PRAGMAs en cada conexion nueva
+        @event.listens_for(_engine.sync_engine, "connect")
+        def _set_sqlite_pragmas(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
     return _engine
 
 

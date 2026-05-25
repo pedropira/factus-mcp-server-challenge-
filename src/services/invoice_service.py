@@ -269,39 +269,39 @@ class InvoiceService:
     # DOWNLOAD — PDF / XML
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def download_pdf(self, number: str) -> httpx.Response:
+    async def download_pdf(self, number: str) -> dict:
         """Download the PDF representation of an invoice.
 
         Args:
             number: Número de la factura asignado por Factus.
 
         Returns:
-            La respuesta HTTP con el contenido binario del PDF.
+            Dict con pdf_base_64_encoded y filename.
         """
-        response = await self._factus.get(f"/v2/bills/{number}/pdf")
+        response = await self._factus.get(f"/v2/bills/{number}/download-pdf")
         await response.aread()
 
         if not response.is_success:
             raise self._build_error(response)
 
-        return response
+        return response.json()
 
-    async def download_xml(self, number: str) -> httpx.Response:
+    async def download_xml(self, number: str) -> dict:
         """Download the XML representation of an invoice.
 
         Args:
             number: Número de la factura asignado por Factus.
 
         Returns:
-            La respuesta HTTP con el contenido XML.
+            Dict con xml_base_64_encoded y filename.
         """
-        response = await self._factus.get(f"/v2/bills/{number}/xml")
+        response = await self._factus.get(f"/v2/bills/{number}/download-xml")
         await response.aread()
 
         if not response.is_success:
             raise self._build_error(response)
 
-        return response
+        return response.json()
 
     # ──────────────────────────────────────────────────────────────────────────
     # PRIVATE — request builders

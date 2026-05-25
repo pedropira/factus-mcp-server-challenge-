@@ -614,18 +614,18 @@ class DeleteCreditNoteParams(BaseModel):
 
 
 class DownloadCreditNotePdfParams(BaseModel):
-    """Download a credit note PDF by its Factus-internal ID."""
+    """Download a credit note PDF by its Factus-assigned number."""
 
-    factus_id: str = Field(
-        min_length=1, description="ID interno de la nota crédito en Factus",
+    number: str = Field(
+        min_length=1, description="Número de nota crédito asignado por Factus (prefijo + consecutivo)",
     )
 
 
 class DownloadCreditNoteXmlParams(BaseModel):
-    """Download a credit note XML by its Factus-internal ID."""
+    """Download a credit note XML by its Factus-assigned number."""
 
-    factus_id: str = Field(
-        min_length=1, description="ID interno de la nota crédito en Factus",
+    number: str = Field(
+        min_length=1, description="Número de nota crédito asignado por Factus (prefijo + consecutivo)",
     )
 
 

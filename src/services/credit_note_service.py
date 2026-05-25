@@ -165,16 +165,16 @@ class CreditNoteService:
     # DOWNLOAD — PDF / XML
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def download_pdf(self, factus_id: str) -> httpx.Response:
+    async def download_pdf(self, number: str) -> dict:
         """Download the PDF representation of a credit note.
 
         Args:
-            factus_id: ID interno de Factus.
+            number: Número de la nota crédito asignado por Factus.
 
         Returns:
-            La respuesta HTTP con el contenido binario del PDF.
+            Dict con pdf_base_64_encoded y filename.
         """
-        response = await self._factus.get(f"/v2/credit-notes/{factus_id}/pdf")
+        response = await self._factus.get(f"/v2/credit-notes/{number}/download-pdf")
         await response.aread()
 
         if not response.is_success:
@@ -184,18 +184,18 @@ class CreditNoteService:
                 body=self._safe_body(response),
             )
 
-        return response
+        return response.json()
 
-    async def download_xml(self, factus_id: str) -> httpx.Response:
+    async def download_xml(self, number: str) -> dict:
         """Download the XML representation of a credit note.
 
         Args:
-            factus_id: ID interno de Factus.
+            number: Número de la nota crédito asignado por Factus.
 
         Returns:
-            La respuesta HTTP con el contenido XML.
+            Dict con xml_base_64_encoded y filename.
         """
-        response = await self._factus.get(f"/v2/credit-notes/{factus_id}/xml")
+        response = await self._factus.get(f"/v2/credit-notes/{number}/download-xml")
         await response.aread()
 
         if not response.is_success:
@@ -205,7 +205,7 @@ class CreditNoteService:
                 body=self._safe_body(response),
             )
 
-        return response
+        return response.json()
 
     # ──────────────────────────────────────────────────────────────────────────
     # PRIVATE

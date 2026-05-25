@@ -79,7 +79,7 @@ class TestValidateItems:
                 "quantity": "1.00",
                 "price": "10000.00",
                 "unit_measure_code": "94",
-                "standard_code": "1",
+                "standard_code": "999",
                 "taxes": [{"code": "01", "rate": "19.00"}],
             }
         ]
@@ -111,7 +111,7 @@ class TestValidateItems:
                 "quantity": "1.00",
                 "price": "-100.00",
                 "unit_measure_code": "94",
-                "standard_code": "1",
+                "standard_code": "999",
                 "taxes": [{"code": "01", "rate": "19.00"}],
             }
         ]
@@ -126,7 +126,7 @@ class TestValidateItems:
                 "quantity": "0.00",
                 "price": "10000.00",
                 "unit_measure_code": "94",
-                "standard_code": "1",
+                "standard_code": "999",
                 "taxes": [{"code": "01", "rate": "19.00"}],
             }
         ]
@@ -141,7 +141,7 @@ class TestValidateItems:
                 "quantity": "1.00",
                 "price": "10000.00",
                 "unit_measure_code": "94",
-                "standard_code": "1",
+                "standard_code": "999",
             }
         ]
         errors = InvoiceValidator.validate_items(items)
@@ -155,7 +155,7 @@ class TestValidateItems:
                 "quantity": "1.00",
                 "price": "10000.00",
                 "unit_measure_code": "94",
-                "standard_code": "1",
+                "standard_code": "999",
                 "taxes": [{"rate": "19.00"}],  # Missing code
             }
         ]
@@ -217,7 +217,7 @@ class TestValidateCombined:
                     "quantity": "1.00",
                     "price": "10000.00",
                     "unit_measure_code": "94",
-                    "standard_code": "1",
+                    "standard_code": "999",
                     "taxes": [{"code": "01", "rate": "19.00"}],
                 }
             ],

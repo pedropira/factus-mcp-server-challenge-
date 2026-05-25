@@ -13,6 +13,7 @@ Verifica:
 
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
@@ -319,37 +320,43 @@ class TestSupportDocumentDownload:
         service: SupportDocumentService,
         mock_factus: MagicMock,
     ) -> None:
-        """GET /v2/support-documents/{number}/pdf -> binary response."""
+        """GET /v2/support-documents/{number}/download-pdf -> JSON con base64."""
         mock_factus.get.return_value = httpx.Response(
             200,
-            content=b"%PDF-1.4 mock pdf content",
-            headers={"Content-Type": "application/pdf"},
+            content=json.dumps({
+                "pdf_base_64_encoded": "JVBERi0xLjQgbW9jayBwZGY=",
+                "name": "SETP990003795.pdf",
+            }).encode(),
+            headers={"Content-Type": "application/json"},
         )
 
-        response = await service.download_pdf("SETP990003795")
+        data = await service.download_pdf("SETP990003795")
 
         mock_factus.get.assert_awaited_once_with(
-            "/v2/support-documents/SETP990003795/pdf"
+            "/v2/support-documents/SETP990003795/download-pdf"
         )
-        assert response.status_code == 200
-        assert response.content.startswith(b"%PDF-1.4")
+        assert data["pdf_base_64_encoded"] == "JVBERi0xLjQgbW9jayBwZGY="
+        assert data["name"] == "SETP990003795.pdf"
 
     async def test_download_xml(
         self,
         service: SupportDocumentService,
         mock_factus: MagicMock,
     ) -> None:
-        """GET /v2/support-documents/{number}/xml -> XML response."""
+        """GET /v2/support-documents/{number}/download-xml -> JSON con base64."""
         mock_factus.get.return_value = httpx.Response(
             200,
-            content=b'<?xml version="1.0" encoding="UTF-8"?><document>...</document>',
-            headers={"Content-Type": "application/xml"},
+            content=json.dumps({
+                "xml_base_64_encoded": "PD94bWwgdmVyc2lvbj0iMS4wIj8+",
+                "name": "SETP990003795.xml",
+            }).encode(),
+            headers={"Content-Type": "application/json"},
         )
 
-        response = await service.download_xml("SETP990003795")
+        data = await service.download_xml("SETP990003795")
 
         mock_factus.get.assert_awaited_once_with(
-            "/v2/support-documents/SETP990003795/xml"
+            "/v2/support-documents/SETP990003795/download-xml"
         )
-        assert response.status_code == 200
-        assert b"<?xml" in response.content
+        assert "xml_base_64_encoded" in data
+        assert data["name"] == "SETP990003795.xml"

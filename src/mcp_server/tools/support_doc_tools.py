@@ -8,7 +8,6 @@ get/delete/download operations.
 
 from __future__ import annotations
 
-import base64
 from typing import TYPE_CHECKING
 
 from src.mcp_server.schemas.tool_params import (
@@ -19,7 +18,7 @@ from src.mcp_server.schemas.tool_params import (
     GetSupportDocumentParams,
     ListSupportDocumentsParams,
 )
-from src.mcp_server.tools._shared import item_to_factus
+from src.mcp_server.tools._shared import error_body, item_to_factus
 from src.schemas.dto import SupportDocumentCreate
 from src.services.support_document_service import SupportDocumentService
 
@@ -54,7 +53,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             result = await svc.create(data)
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def list_support_documents(
@@ -77,7 +76,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             )
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def get_support_document(params: GetSupportDocumentParams) -> dict:
@@ -94,7 +93,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 }
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def delete_support_document(
@@ -108,7 +107,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
             result = await svc.delete(params.reference_code)
             return {"success": True, "data": result}
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def download_support_document_pdf(
@@ -119,20 +118,16 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         Returns base64-encoded PDF content.
         """
         try:
-            response = await svc.download_pdf(params.number)
-            content = base64.b64encode(response.content).decode()
+            data = await svc.download_pdf(params.number)
             return {
                 "success": True,
                 "data": {
-                    "content": content,
-                    "content_type": response.headers.get(
-                        "content-type", "application/pdf"
-                    ),
-                    "filename": f"support_doc_{params.number}.pdf",
+                    "content": data.get("pdf_base_64_encoded", ""),
+                    "filename": data.get("name", f"support_doc_{params.number}.pdf"),
                 },
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
     @server.tool()
     async def download_support_document_xml(
@@ -143,20 +138,16 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         Returns base64-encoded XML content.
         """
         try:
-            response = await svc.download_xml(params.number)
-            content = base64.b64encode(response.content).decode()
+            data = await svc.download_xml(params.number)
             return {
                 "success": True,
                 "data": {
-                    "content": content,
-                    "content_type": response.headers.get(
-                        "content-type", "application/xml"
-                    ),
-                    "filename": f"support_doc_{params.number}.xml",
+                    "content": data.get("xml_base_64_encoded", ""),
+                    "filename": data.get("name", f"support_doc_{params.number}.xml"),
                 },
             }
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": error_body(e)}
 
 
 __all__ = ["register"]
