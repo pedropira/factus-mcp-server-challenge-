@@ -46,17 +46,23 @@ class CreditNoteService:
         payload = {
             "reference_code": data.reference_code,
             "document": data.document or "02",
-            "operation_type": data.operation_type or "20",
             "correction_concept_code": data.correction_concept_code,
             "observation": data.observation or "",
             "send_email": data.send_email,
-            "invoice_reference": data.invoice_reference,
+            "bill_number": data.bill_number,
             "payment_details": data.payment_details,
             "customer": data.customer,
             "items": data.items,
         }
 
-        response = await self._factus.post("/v2/credit-notes", json=payload)
+        # customization_id reemplaza a operation_type en notas crédito
+        # (default "20" = NC que referencia factura)
+        payload["customization_id"] = "20"
+
+        if data.numbering_range_id is not None:
+            payload["numbering_range_id"] = data.numbering_range_id
+
+        response = await self._factus.post("/v2/credit-notes/validate", json=payload)
         await response.aread()
 
         if not response.is_success:

@@ -171,11 +171,11 @@ class CreditNoteCreate(SQLModel):
 
     reference_code: str = Field(max_length=100)
     document: str = Field(default="02", description="02=nota crédito")
-    operation_type: str = Field(default="20", description="20=NC que referencia factura")
     correction_concept_code: str = Field(description="Código de corrección (1-6)")
     observation: Optional[str] = Field(default=None, max_length=250)
     send_email: bool = Field(default=False)
-    invoice_reference: str = Field(description="Número de factura que referencia")
+    bill_number: str = Field(description="Número de factura que referencia (prefijo + consecutivo)")
+    numbering_range_id: Optional[int] = Field(default=None, description="ID del rango de numeración")
     payment_details: list[dict]
     customer: dict
     items: list[dict]

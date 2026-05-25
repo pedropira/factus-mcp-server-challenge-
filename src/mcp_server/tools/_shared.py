@@ -47,8 +47,14 @@ def item_to_factus(item: object) -> dict:
     Mapea los IDs internos (unit_measure_id, standard_code_id, tribute_id)
     a los códigos DIAN que la API de Factus espera, y arma el array de
     taxes con code + rate.
+
+    Importante: NO usamos exclude_none=True porque discount_rate es
+    requerido por la API de Factus (incluso si es 0.00).
     """
-    d = json_safe(item.model_dump(exclude_none=True))
+    d = json_safe(item.model_dump())
+    # Siempre incluir discount_rate — la API de Factus lo requiere
+    if d.get("discount_rate") is None:
+        d["discount_rate"] = "0.00"
     d["unit_measure_code"] = _map_unit_measure_id(item.unit_measure_id)
     d["standard_code"] = _map_standard_code_id(item.standard_code_id)
     tax_code = _map_item_tribute_to_tax_code(item.tribute_id)
@@ -56,4 +62,7 @@ def item_to_factus(item: object) -> dict:
     d.pop("unit_measure_id", None)
     d.pop("standard_code_id", None)
     d.pop("tribute_id", None)
+    # convertir discount_rate a string (model_dump lo deja como Decimal o None)
+    if not isinstance(d["discount_rate"], str):
+        d["discount_rate"] = f"{d['discount_rate']:.2f}"
     return d

@@ -105,7 +105,8 @@ Códigos de concepto (`correction_concept_code`):
 Usa `create_credit_note` con:
 - `reference_code`: Código único interno para la nota crédito
 - `correction_concept_code`: Código del concepto de corrección (1-6)
-- `invoice_reference`: Número de factura Factus que se corrige (incluye prefijo, ej: "SETP990003793")
+- `bill_number`: Número de factura Factus que se corrige (incluye prefijo, ej: "SETP990003793")
+- `numbering_range_id`: ID del rango de numeración (opcional, usa el default si no se envía)
 - `customer`: Datos del cliente (misma estructura que en factura)
 - `items`: Items a corregir (solo los que aplican)
 - `payment_details`: Detalles de pago

@@ -94,13 +94,13 @@ class TestReteRenta:
         assert 0 in result
         assert len(result[0]) == 1
         assert result[0][0]["code"] == "06"
-        assert result[0][0]["withholding_tax_rate"] == "2.50"
+        assert result[0][0]["rate"] == "2.50"
         assert result[0][0]["tax_amount"] == "50000.00"
 
     def test_legal_entity_above_threshold(self) -> None:
         """Persona jurídica, above 27 UVT → ReteRenta 3.5%."""
         result = calculate(self.CUSTOMER_LEGAL, self.ITEM_GOODS, Decimal("2000000.00"))
-        assert result[0][0]["withholding_tax_rate"] == "3.50"
+        assert result[0][0]["rate"] == "3.50"
         assert result[0][0]["tax_amount"] == "70000.00"
 
     def test_below_uvt_threshold_no_reterenta(self) -> None:
@@ -140,7 +140,7 @@ class TestReteRenta:
             }
         ]
         result = calculate(self.CUSTOMER_NATURAL, service_items, Decimal("2000000.00"))
-        assert result[0][0]["withholding_tax_rate"] == "4.00"
+        assert result[0][0]["rate"] == "4.00"
         assert result[0][0]["tax_amount"] == "80000.00"
 
     def test_reterenta_distributed_proportionally(self) -> None:

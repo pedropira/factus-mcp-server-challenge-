@@ -45,7 +45,7 @@ def sample_create_data() -> CreditNoteCreate:
     return CreditNoteCreate(
         reference_code="CN-TEST-001",
         correction_concept_code="1",
-        invoice_reference="SETP990003793",
+        bill_number="SETP990003793",
         payment_details=[
             {
                 "payment_form": "1",
@@ -116,18 +116,18 @@ class TestCreditNoteCreate:
 
         # Verify endpoint and payload
         mock_factus.post.assert_awaited_once_with(
-            "/v2/credit-notes",
+            "/v2/credit-notes/validate",
             json={
                 "reference_code": "CN-TEST-001",
                 "document": "02",
-                "operation_type": "20",
                 "correction_concept_code": "1",
                 "observation": "",
                 "send_email": False,
-                "invoice_reference": "SETP990003793",
+                "bill_number": "SETP990003793",
                 "payment_details": sample_create_data.payment_details,
                 "customer": sample_create_data.customer,
                 "items": sample_create_data.items,
+                "customization_id": "20",
             },
         )
 

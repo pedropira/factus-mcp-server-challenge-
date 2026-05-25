@@ -363,12 +363,17 @@ class _PaymentDetail(BaseModel):
     payment_method_code: str = Field(
         description="Código del método de pago (ej: 10=efectivo, 20=transferencia)"
     )
-    payment_due_date: str = Field(
-        description="Fecha de vencimiento (YYYY-MM-DD)"
+    due_date: Optional[str] = Field(
+        default=None,
+        description="Fecha de vencimiento (YYYY-MM-DD). Requerido solo si payment_form=2 (crédito)",
     )
     payment_form: str = Field(
         default="1", description="Forma de pago (1=contado, 2=crédito)"
     )
+    reference_code: Optional[str] = Field(
+        default=None, description="Código de referencia del pago (opcional)",
+    )
+    # NOTA: 'amount' se calcula automáticamente en InvoiceService._enrich_with_totals
 
 
 class _InvoiceItemInput(BaseModel):
@@ -405,6 +410,10 @@ class _InvoiceItemInput(BaseModel):
 class _AllowanceChargeInput(BaseModel):
     """A global discount or surcharge applied at invoice level."""
 
+    concept_type: str = Field(
+        description="Código del tipo de descuento/recargo. "
+        "Ver tablas de referencia Factus (ej: 01=descuento comercial, 02=descuento por volumen, etc.)",
+    )
     is_surcharge: bool = Field(
         description="True=recargo, False=descuento",
     )
@@ -558,7 +567,11 @@ class DownloadInvoiceXmlParams(BaseModel):
 
 
 class CreateCreditNoteParams(BaseModel):
-    """Create a credit note via Factus API (POST /v2/credit-notes)."""
+    """Create a credit note via Factus API (POST /v2/credit-notes).
+
+    Las notas crédito referencian una factura existente usando su número
+    asignado por Factus (bill_number: prefijo + consecutivo).
+    """
 
     reference_code: str = Field(
         max_length=100, description="Código único de referencia",
@@ -570,8 +583,12 @@ class CreateCreditNoteParams(BaseModel):
         default=None, max_length=250, description="Observación (max 250 chars)",
     )
     send_email: bool = Field(default=False, description="Enviar correo al cliente")
-    invoice_reference: str = Field(
-        description="Número de factura que referencia (prefijo + consecutivo)",
+    bill_number: str = Field(
+        description="Número de factura que referencia (prefijo + consecutivo, ej: SETP990003791)",
+    )
+    numbering_range_id: Optional[int] = Field(
+        default=None,
+        description="ID del rango de numeración (opcional, usa el default si no se envía)",
     )
     payment_details: list[_PaymentDetail] = Field(
         description="Detalles de pago",

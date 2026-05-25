@@ -35,7 +35,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
     async def create_credit_note(params: CreateCreditNoteParams) -> dict:
         """Create a credit note via Factus API (POST /v2/credit-notes).
 
-        Credit notes correct existing invoices. The invoice_reference is
+        Credit notes correct existing invoices. The bill_number is
         the Factus-assigned number of the invoice being corrected.
         correction_concept_code: 1=devolución, 2=anulación, etc.
         """
@@ -45,7 +45,8 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
                 correction_concept_code=params.correction_concept_code,
                 observation=params.observation or "",
                 send_email=params.send_email,
-                invoice_reference=params.invoice_reference,
+                bill_number=params.bill_number,
+                numbering_range_id=params.numbering_range_id,
                 payment_details=[
                     json_safe(pd.model_dump()) for pd in params.payment_details
                 ],

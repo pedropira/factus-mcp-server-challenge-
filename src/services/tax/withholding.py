@@ -41,9 +41,11 @@ def calculate(
         Dict mapping item index → list of withholding tax dicts in
         Factus API format:
         {
-            0: [{"code": "06", "withholding_tax_rate": "2.50", "tax_amount": "37500.00"}],
+            0: [{"code": "06", "rate": "2.50", "tax_amount": "37500.00"}],
             1: [],
         }
+    NOTA: El campo se llama 'rate' (no 'withholding_tax_rate') según
+    la documentación oficial de Factus API v2 para items.*.withholding_taxes.*.rate
     """
     result: dict[int, list[dict[str, str]]] = {i: [] for i in range(len(items))}
     if not items:
@@ -59,7 +61,7 @@ def calculate(
         reterenta_amount = _round(gross_total * reterenta_rate / Decimal("100"))
         reterenta_dict = {
             "code": "06",
-            "withholding_tax_rate": f"{reterenta_rate:.2f}",
+            "rate": f"{reterenta_rate:.2f}",
             "tax_amount": f"{reterenta_amount:.2f}",
         }
         # Distribute ReteRenta proportionally across all items
@@ -71,7 +73,7 @@ def calculate(
                 if item_amount > Decimal("0"):
                     result[idx].append({
                         "code": "06",
-                        "withholding_tax_rate": f"{reterenta_rate:.2f}",
+            "rate": f"{reterenta_rate:.2f}",
                         "tax_amount": f"{item_amount:.2f}",
                     })
             else:
@@ -83,7 +85,7 @@ def calculate(
         if amount > Decimal("0"):
             result[idx].append({
                 "code": "05",
-                "withholding_tax_rate": f"{config.RETE_IVA_RATE:.2f}",
+                "rate": f"{config.RETE_IVA_RATE:.2f}",
                 "tax_amount": f"{amount:.2f}",
             })
 
@@ -95,7 +97,7 @@ def calculate(
             rate = _get_reteica_rate(municipality, _is_service_item(items[idx]))
             result[idx].append({
                 "code": "07",
-                "withholding_tax_rate": f"{rate:.2f}",
+                "rate": f"{rate:.2f}",
                 "tax_amount": f"{amount:.2f}",
             })
 
@@ -111,7 +113,7 @@ def calculate(
                 if item_gmf > Decimal("0"):
                     result[idx].append({
                         "code": "20",
-                        "withholding_tax_rate": f"{config.RETE_GMF_RATE:.2f}",
+                        "rate": f"{config.RETE_GMF_RATE:.2f}",
                         "tax_amount": f"{item_gmf:.2f}",
                     })
 
