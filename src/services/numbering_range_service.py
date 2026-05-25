@@ -39,7 +39,7 @@ class NumberingRangeService:
         return await self._repo.create(numbering_range)
 
     async def get_active(
-        self, document_type_id: Optional[int] = None
+        self, document_type_id: Optional[str] = None
     ) -> Sequence[NumberingRange]:
         """Return active ranges from local DB."""
         return await self._repo.get_active(document_type_id)
@@ -66,10 +66,10 @@ class NumberingRangeService:
     # ── Local DB — queries ───────────────────────────────────────────────
 
     async def get_default_for_document_type(
-        self, document_type_id: int
+        self, document_type_id: str
     ) -> Optional[NumberingRange]:
         """Return the first active range for a document type from local DB."""
-        return await self._repo.get_default(document_type_id)
+        return await self._repo.get_default_for_document_type(document_type_id)
 
     # ── Local DB — number assignment ─────────────────────────────────────
 

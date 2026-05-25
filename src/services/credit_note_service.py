@@ -113,7 +113,7 @@ class CreditNoteService:
         except (KeyError, IndexError):
             return None
 
-    async def get_by_id(self, factus_id: int) -> Optional[dict]:
+    async def get_by_id(self, factus_id: str) -> Optional[dict]:
         """Get a credit note by its Factus-internal ID.
 
         Args:
@@ -140,7 +140,7 @@ class CreditNoteService:
     # DELETE — DELETE /v2/credit-notes/{id}
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def delete(self, factus_id: int) -> dict:
+    async def delete(self, factus_id: str) -> dict:
         """Delete a credit note by its Factus-internal ID.
 
         Args:
@@ -165,7 +165,7 @@ class CreditNoteService:
     # DOWNLOAD — PDF / XML
     # ──────────────────────────────────────────────────────────────────────────
 
-    async def download_pdf(self, factus_id: int) -> httpx.Response:
+    async def download_pdf(self, factus_id: str) -> httpx.Response:
         """Download the PDF representation of a credit note.
 
         Args:
@@ -186,7 +186,7 @@ class CreditNoteService:
 
         return response
 
-    async def download_xml(self, factus_id: int) -> httpx.Response:
+    async def download_xml(self, factus_id: str) -> httpx.Response:
         """Download the XML representation of a credit note.
 
         Args:

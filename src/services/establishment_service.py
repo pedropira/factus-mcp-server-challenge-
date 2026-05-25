@@ -36,7 +36,9 @@ class EstablishmentService:
         self, offset: int = 0, limit: int = 20
     ) -> Sequence[Establishment]:
         """Return paginated establishments sorted by name."""
-        return await self._repo.list(offset, limit)
+        return await self._repo.get_all(
+            offset=offset, limit=limit, order_field="name"
+        )
 
     async def update(
         self, id: int, data: EstablishmentUpdate
