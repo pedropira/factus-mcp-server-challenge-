@@ -1,18 +1,20 @@
 """Entry point for the Factus MCP Server.
 
-Run with:  mcp run main.py
-Dev mode:  mcp dev main.py
+Dev:        mcp dev main.py
+Production: python main.py  (reads $PORT env var)
 """
 
-import asyncio
+import os
+
 from src.mcp_server.main import create_server
 
 mcp = create_server()
 
-async def main():
-    async with mcp:
-        pass
-
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.getenv("PORT", "8000"))
+    mcp.run(
+        transport="sse",
+        host="0.0.0.0",
+        port=port,
+    )

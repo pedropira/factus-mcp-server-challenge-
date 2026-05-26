@@ -28,5 +28,5 @@ COPY . .
 # Puerto que Railway asigna (se sobrescribe con $PORT)
 EXPOSE 8080
 
-# Railway provee el puerto via $PORT; default 8080 por si no está definido
-CMD mcp run main.py --transport sse --port ${PORT:-8080}
+# Railway provee el puerto via $PORT; main.py lee esa variable
+CMD python main.py
