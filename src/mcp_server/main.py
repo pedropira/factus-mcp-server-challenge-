@@ -9,6 +9,7 @@ Creates and configures a FastMCP server instance with:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -24,6 +25,8 @@ from src.infrastructure.factus_client import FactusClient
 from src.mcp_server.prompts import register_all_prompts
 from src.mcp_server.resources import register_all_resources
 from src.mcp_server.tools import register_all_tools
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -109,6 +112,7 @@ def create_server() -> FastMCP:
         lifespan=_lifespan,
         host="0.0.0.0",
         streamable_http_path="/api",
+        json_response=True,
     )
     return server
 
