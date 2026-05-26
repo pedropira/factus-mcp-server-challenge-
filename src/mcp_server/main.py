@@ -107,6 +107,7 @@ def create_server() -> FastMCP:
         de Factus. También incluye recursos con códigos DIAN y prompts guiados.
         """,
         lifespan=_lifespan,
+        host="0.0.0.0",
         streamable_http_path="/api",
     )
     return server
