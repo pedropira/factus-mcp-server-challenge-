@@ -112,13 +112,17 @@ def customer_to_factus_dict(
 
     Returns:
         Dict ready to use as the ``customer`` field in Factus API requests.
+
+    Raises:
+        ValueError: Si el cliente es NIT y no tiene DV (dígito de verificación).
     """
+    id_doc_code = _map_identification_document_id(
+        customer.identification_document_id
+    )
+
     result: dict[str, Any] = {
-        "identification_document_code": _map_identification_document_id(
-            customer.identification_document_id
-        ),
+        "identification_document_code": id_doc_code,
         "identification": customer.identification,
-        "dv": customer.dv or "",
         "company": customer.company or "",
         "trade_name": customer.trade_name or "",
         "names": customer.names or "",
@@ -131,6 +135,19 @@ def customer_to_factus_dict(
         "tribute_code": _map_tribute_id(customer.tribute_id),
         "municipality_code": customer.municipality_id or "",
     }
+
+    # DV handling: NIT requires a valid DV; for other doc types it's optional
+    if id_doc_code == "31":  # NIT
+        if not customer.dv:
+            raise ValueError(
+                f"DV (dígito de verificación) es REQUERIDO para NIT. "
+                f"Cliente '{customer.names or customer.company}' "
+                f"(ID {customer.id}, NIT {customer.identification}) "
+                f"no tiene DV registrado."
+            )
+        result["dv"] = customer.dv
+    elif customer.dv:
+        result["dv"] = customer.dv
 
     # Remove empty/None values to keep payload clean
     return _clean_dict(result)
@@ -183,6 +200,14 @@ def provider_to_factus_dict(provider: dict) -> dict[str, Any]:
     for field in ("identification", "dv", "company", "trade_name", "names",
                   "address", "email", "phone"):
         result[field] = provider.get(field, "")
+
+    # ── names fallback: si hay company pero no names, copiar ──
+    if not result["names"] and result["company"]:
+        result["names"] = result["company"]
+
+    # ── country_code (obligatorio para Documento Soporte) ──
+    if "country_code" in provider:
+        result["country_code"] = provider["country_code"]
 
     # ── legal_organization ──
     if "legal_organization_code" in provider:

@@ -15,7 +15,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from src.core.config import Settings
-from src.infrastructure.database import create_db_and_tables, get_async_session
+from src.infrastructure.database import (
+    create_db_and_tables,
+    dispose_engine,
+    get_async_session,
+)
 from src.infrastructure.factus_client import FactusClient
 from src.mcp_server.prompts import register_all_prompts
 from src.mcp_server.resources import register_all_resources
@@ -76,6 +80,7 @@ async def _lifespan(server: FastMCP) -> AsyncIterator[None]:
         yield
     finally:
         await factus_client.__aexit__(None, None, None)
+        await dispose_engine()  # Liberar la DB para que otros procesos puedan usarla
 
 
 # ── Server factory ────────────────────────────────────────────────────────

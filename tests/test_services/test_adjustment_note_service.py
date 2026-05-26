@@ -126,7 +126,7 @@ class TestAdjustmentNoteCreate:
                         "payment_form": "1",
                         "payment_method_code": "42",
                         "reference_code": "pago-001",
-                        "amount": "60000.00",
+                        "amount": "29750.00",
                         "due_date": "2025-01-01",
                     },
                 ],

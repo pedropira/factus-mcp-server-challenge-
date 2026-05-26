@@ -38,15 +38,29 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         Credit notes correct existing invoices. The bill_number is
         the Factus-assigned number of the invoice being corrected.
         correction_concept_code: 1=devolución, 2=anulación, etc.
+
+        The numbering_range_id is your LOCAL database ID — the tool
+        automatically resolves it to the Factus API ID before sending.
         """
         try:
+            # Resolver numbering_range_id local → Factus API ID
+            factus_range_id: int = params.numbering_range_id
+            async with deps.get_session() as session:
+                from src.services.numbering_range_service import (
+                    NumberingRangeService,
+                )
+                numbering_svc = NumberingRangeService(session=session)
+                factus_range_id = await numbering_svc.get_factus_id(
+                    params.numbering_range_id
+                )
+
             data = CreditNoteCreate(
                 reference_code=params.reference_code,
                 correction_concept_code=params.correction_concept_code,
                 observation=params.observation or "",
                 send_email=params.send_email,
                 bill_number=params.bill_number,
-                numbering_range_id=params.numbering_range_id,
+                numbering_range_id=factus_range_id,
                 payment_details=[
                     json_safe(pd.model_dump()) for pd in params.payment_details
                 ],

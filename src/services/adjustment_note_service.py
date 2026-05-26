@@ -18,6 +18,7 @@ import httpx
 
 from src.infrastructure.factus_client import FactusClient
 from src.schemas.dto import AdjustmentNoteCreate
+from src.services.enrich import enrich_with_totals
 from src.services.invoice_service import FactusApiError
 from src.services.mappers import provider_to_factus_dict
 
@@ -59,6 +60,8 @@ class AdjustmentNoteService:
             payload["numbering_range_id"] = data.numbering_range_id
         if data.cash_rounding_amount is not None:
             payload["cash_rounding_amount"] = data.cash_rounding_amount
+
+        payload = enrich_with_totals(payload)
 
         response = await self._factus.post(
             "/v2/adjustment-notes/validate", json=payload

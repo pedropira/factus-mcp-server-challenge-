@@ -162,10 +162,10 @@ class TestInvoiceServiceCreate:
 
         # Verify totals calculated
         total = float(payload["payment_details"][0]["amount"])
-        # Item A: 2 x 25000 = 50000 gross, tax = 50000*(19/119) = 7983.19
-        # Item B: 1 x 50000 x 0.9 = 45000 gross, tax = 45000*(19/119) = 7184.87
-        # Gross = 95000, Tax = 15168.06, Total = 110168.06
-        assert total == 110168.06, f"Expected 110168.06, got {total}"
+        # Item A: 2 x 25000 = 50000 gross, tax = 50000*(19/100) = 9500
+        # Item B: 1 x 50000 x 0.9 = 45000 gross, tax = 45000*(19/100) = 8550
+        # Gross = 95000, Tax = 18050, Total = 113050.00
+        assert total == 113050.00, f"Expected 113050.00, got {total}"
 
         # Verify response
         assert result["status"] == "Created"
@@ -450,8 +450,8 @@ class TestEnrichWithTotals:
         }
         result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
-        # gross=10000, tax=10000*(19/119)=1596.64, total=11596.64
-        assert total == 11596.64
+        # gross=10000, tax=10000*(19/100)=1900, total=11900
+        assert total == 11900.00
 
     def test_calculates_multi_item_with_discount(self) -> None:
         from src.services.enrich import enrich_with_totals
@@ -475,10 +475,10 @@ class TestEnrichWithTotals:
         }
         result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
-        # Item A: 2 x 25000 = 50000 gross, tax=50000*(19/119)=7983.19
-        # Item B: 1 x 50000 x 0.90 = 45000 gross, tax=45000*(19/119)=7184.87
-        # Gross = 95000, Tax = 15168.06, Total = 110168.06
-        assert total == 110168.06
+        # Item A: 2 x 25000 = 50000 gross, tax=50000*(19/100)=9500
+        # Item B: 1 x 50000 x 0.90 = 45000 gross, tax=45000*(19/100)=8550
+        # Gross=95000, Tax=18050, Total=113050.00
+        assert total == 113050.00
 
     def test_no_items(self) -> None:
         from src.services.enrich import enrich_with_totals
@@ -511,9 +511,9 @@ class TestEnrichWithTotals:
         }
         result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
-        # gross=100000, tax=100000*(19/119)=15966.39, disc=-5000, surch=+3000
-        # total = 100000 + 15966.39 - 5000 + 3000 = 113966.39
-        assert total == 113966.39
+        # gross=100000, tax=100000*(19/100)=19000, disc=-5000, surch=+3000
+        # total = 100000 + 19000 - 5000 + 3000 = 117000.00
+        assert total == 117000.00
 
     def test_multiple_tax_rates(self) -> None:
         from src.services.enrich import enrich_with_totals
@@ -535,9 +535,9 @@ class TestEnrichWithTotals:
         }
         result = enrich_with_totals(payload)
         total = float(result["payment_details"][0]["amount"])
-        # gross=100000, tax_iva=100000*(19/119)=15966.39, tax_inc=100000*(8/108)=7407.41
-        # total = 100000 + 15966.39 + 7407.41 = 123373.80
-        assert total == 123373.80
+        # gross=100000, tax_iva=100000*(19/100)=19000, tax_inc=100000*(8/100)=8000
+        # total = 100000 + 19000 + 8000 = 127000.00
+        assert total == 127000.00
 
 
 # ─── CREATE WITH NUMBERING ───────────────────────────────────────────────
@@ -636,7 +636,10 @@ class TestInvoiceServiceCreateWithNumbering:
 
         # Totals calculated
         total = float(payload["payment_details"][0]["amount"])
-        assert total == 110168.06
+        # Item A: 2 x 25000 = 50000 gross, tax=50000*(19/100)=9500
+        # Item B: 1 x 50000 x 0.9 = 45000 gross, tax=45000*(19/100)=8550
+        # Gross=95000, Tax=18050, Total=113050.00
+        assert total == 113050.00
 
         # Withholding taxes should be present (Gran Contribuyente + transfer payment)
         # ReteIVA triggers because Gran Contribuyente (tribute "22")

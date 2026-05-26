@@ -18,6 +18,7 @@ import httpx
 
 from src.infrastructure.factus_client import FactusClient
 from src.schemas.dto import SupportDocumentCreate
+from src.services.enrich import enrich_with_totals
 from src.services.invoice_service import FactusApiError
 from src.services.mappers import provider_to_factus_dict
 
@@ -47,11 +48,14 @@ class SupportDocumentService:
         payload = {
             "reference_code": data.reference_code,
             "document": data.document or "03",
+            "payment_details": data.payment_details,
             "provider": provider_to_factus_dict(data.provider),
             "items": data.items,
             "observation": data.observation or "",
             "send_email": data.send_email,
         }
+
+        payload = enrich_with_totals(payload)
 
         response = await self._factus.post("/v2/support-documents/validate", json=payload)
         await response.aread()

@@ -131,7 +131,7 @@ class TestCreditNoteCreate:
                         "payment_form": "1",
                         "payment_method_code": "10",
                         "reference_code": "PAY-CN-001",
-                        "amount": "28991.60",
+                        "amount": "29750.00",
                     }
                 ],
                 "customer": sample_create_data.customer,

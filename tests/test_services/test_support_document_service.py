@@ -43,16 +43,25 @@ def service(mock_factus: MagicMock) -> SupportDocumentService:
 def sample_create_data() -> SupportDocumentCreate:
     return SupportDocumentCreate(
         reference_code="SD-TEST-001",
+        payment_details=[
+            {
+                "payment_method_code": "10",
+                "payment_form": "1",
+            },
+        ],
         provider={
-            "identification_document_code": "13",
-            "identification": "222222222222",
-            "names": "Proveedor de prueba",
+            "identification_document_code": "31",
+            "identification": "900123456",
+            "dv": "8",
+            "company": "Proveedor de prueba S.A.S.",
+            "names": "Proveedor de prueba S.A.S.",
             "address": "Calle 123 # 45-67",
             "email": "proveedor@example.com",
             "phone": "3001234567",
-            "legal_organization_code": "2",
-            "tribute_code": "ZZ",
+            "legal_organization_code": "1",
+            "tribute_code": "01",
             "municipality_code": "11001",
+            "country_code": "Co",
         },
         items=[
             {
@@ -108,6 +117,7 @@ class TestSupportDocumentCreate:
             "/v2/support-documents/validate", json={
                 "reference_code": "SD-TEST-001",
                 "document": "03",
+                "payment_details": sample_create_data.payment_details,
                 "provider": sample_create_data.provider,
                 "items": sample_create_data.items,
                 "observation": "",

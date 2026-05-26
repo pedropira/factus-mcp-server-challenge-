@@ -175,7 +175,10 @@ class CreditNoteCreate(SQLModel):
     observation: Optional[str] = Field(default=None, max_length=250)
     send_email: bool = Field(default=False)
     bill_number: str = Field(description="Número de factura que referencia (prefijo + consecutivo)")
-    numbering_range_id: int = Field(description="ID del rango de numeración (obligatorio para Factus API)")
+    numbering_range_id: int = Field(
+        description="ID del rango de numeración en la API de Factus "
+        "(resuelto automáticamente desde el ID local por el tool layer)"
+    )
     payment_details: list[dict]
     customer: dict
     items: list[dict]
@@ -198,6 +201,9 @@ class SupportDocumentCreate(SQLModel):
     )
     document: str = Field(
         default="03", description="Tipo de documento (03=documento soporte)"
+    )
+    payment_details: list[dict] = Field(
+        description="Detalles de pago (array con método, fecha, forma)"
     )
     provider: dict = Field(description="Datos del proveedor (similar a customer)")
     items: list[dict] = Field(description="Ítems del documento soporte")

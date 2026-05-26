@@ -40,7 +40,7 @@ def get_engine(settings: Optional[Settings] = None) -> AsyncEngine:
             db_url,
             echo=False,  # Cambiar a True para debug SQL
             connect_args={
-                "timeout": 15,  # Esperar 15s por lock antes de fallar
+                "timeout": 60,  # Esperar 60s por lock (el Inspector puede estar usando la DB)
                 "check_same_thread": False,  # Necesario para uso async
             },
             pool_pre_ping=True,  # Verificar conexion antes de usar
@@ -74,6 +74,18 @@ async def create_db_and_tables(settings: Optional[Settings] = None) -> None:
         from src.schemas import models  # noqa: F401 — import necesario para registrar modelos en metadata
 
         await conn.run_sync(SQLModel.metadata.create_all)
+
+
+async def dispose_engine() -> None:
+    """Libera el engine global y cierra todas las conexiones.
+
+    Debe llamarse durante el shutdown del servidor para evitar locks
+    en la base de datos SQLite entre procesos.
+    """
+    global _engine
+    if _engine is not None:
+        await _engine.dispose()
+        _engine = None
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

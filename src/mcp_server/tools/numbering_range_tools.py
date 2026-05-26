@@ -99,15 +99,19 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         """Fetch numbering ranges from Factus API and sync to local database.
 
         This calls GET /v2/numbering-ranges on Factus API and stores or
-        updates each range in the local database. Use this when setting up
-        a new environment or after getting a new DIAN resolution.
+        updates each range in the local database. The `factus_id` column
+        is populated so that credit notes and adjustment notes can
+        automatically resolve local numbering_range_id → Factus API ID.
+
+        Use this when setting up a new environment or after getting a
+        new DIAN resolution. After syncing, `create_credit_note` will
+        automatically use the correct Factus API ID.
         """
         try:
             async with deps.get_session() as session:
                 service = NumberingRangeService(
                     session=session, factus=deps.factus
                 )
-                # The fetch_from_factus method syncs ranges from API to DB
                 results = await service.fetch_from_factus()
                 return {
                     "success": True,

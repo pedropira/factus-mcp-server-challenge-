@@ -363,6 +363,9 @@ class _PaymentDetail(BaseModel):
     payment_method_code: str = Field(
         description="Código del método de pago (ej: 10=efectivo, 20=transferencia)"
     )
+    amount: str = Field(
+        description="Valor del pago (ej: '1500000.00'). En facturas se calcula automáticamente; en DS/NA es obligatorio.",
+    )
     due_date: Optional[str] = Field(
         default=None,
         description="Fecha de vencimiento (YYYY-MM-DD). Requerido solo si payment_form=2 (crédito)",
@@ -373,7 +376,6 @@ class _PaymentDetail(BaseModel):
     reference_code: Optional[str] = Field(
         default=None, description="Código de referencia del pago (opcional)",
     )
-    # NOTA: 'amount' se calcula automáticamente en InvoiceService._enrich_with_totals
 
 
 class _InvoiceItemInput(BaseModel):
@@ -500,7 +502,8 @@ class CreateInvoiceWithNumberingParams(BaseModel):
         description="ID del cliente en la base de datos local",
     )
     numbering_range_id: int = Field(
-        description="ID del rango de numeración en la base de datos local",
+        description="ID del rango de numeración en la base de datos local "
+        "(se usa para asignar el próximo número disponible)",
     )
     establishment_id: Optional[int] = Field(
         default=None,
@@ -587,7 +590,8 @@ class CreateCreditNoteParams(BaseModel):
         description="Número de factura que referencia (prefijo + consecutivo, ej: SETP990003791)",
     )
     numbering_range_id: int = Field(
-        description="ID del rango de numeración en la base de datos local (es obligatorio para Factus API)",
+        description="ID del rango de numeración en la base de datos local "
+        "(se resuelve automáticamente al ID de Factus API al crear la nota crédito)",
     )
     payment_details: list[_PaymentDetail] = Field(
         description="Detalles de pago",
@@ -659,6 +663,9 @@ class CreateSupportDocumentParams(BaseModel):
 
     reference_code: str = Field(
         max_length=100, description="Código único de referencia",
+    )
+    payment_details: list[_PaymentDetail] = Field(
+        description="Detalles de pago (método, fecha, forma)",
     )
     provider: dict = Field(
         description="Datos del proveedor en formato Factus API",

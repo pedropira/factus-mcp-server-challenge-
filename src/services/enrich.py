@@ -19,8 +19,8 @@ def enrich_with_totals(payload: dict) -> dict:
     Para cada item:
       1. gross = price * quantity * (1 - discount_rate/100)
       2. Para cada impuesto en item.taxes[]:
-           tax_amount = gross * (rate / (100 + rate))
-         (el precio YA incluye IVA)
+           tax_amount = gross * rate / 100
+         (el precio es SIN IVA — la API Factus espera impuesto a tasa completa)
       3. Suma todos los impuestos del item
 
     Total general = suma de gross + suma de taxes.
@@ -70,9 +70,9 @@ def enrich_with_totals(payload: dict) -> dict:
 def _calculate_item_taxes(item: dict[str, Any]) -> tuple[Decimal, Decimal]:
     """Calculate gross and tax amounts for a single item.
 
-    El precio en Factus API incluye impuestos (CON IVA incluído).
-    Para extraer el impuesto:
-        tax_amount = gross * (rate / (100 + rate))
+    El precio en Factus API es SIN IVA (precio base).
+    El impuesto se calcula sobre el precio base:
+        tax_amount = gross * rate / 100
 
     Args:
         item: Item dict con price, quantity, discount_rate, taxes[].
@@ -98,8 +98,8 @@ def _calculate_item_taxes(item: dict[str, Any]) -> tuple[Decimal, Decimal]:
         except Exception:
             continue
         if rate > Decimal("0"):
-            # Price includes tax, so tax = gross * (rate / (100 + rate))
-            tax_amount = gross * rate / (Decimal("100") + rate)
+            # Price is WITHOUT tax, so tax = gross * rate / 100
+            tax_amount = gross * rate / Decimal("100")
             tax_amount = tax_amount.quantize(Decimal("0.01"))
             total_tax += tax_amount
 

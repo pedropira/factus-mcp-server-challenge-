@@ -125,6 +125,9 @@ class NumberingRange(SQLModel, table=True):
     __tablename__ = "numbering_ranges"
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    factus_id: Optional[int] = Field(
+        default=None, description="ID del rango en la API de Factus (se obtiene al sincronizar)",
+    )
     prefix: str = Field(
         max_length=10, description="Prefijo del rango (ej: SETP, FAC)",
     )

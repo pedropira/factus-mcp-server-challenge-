@@ -45,6 +45,7 @@ def register(server: FastMCP, deps: ServerDeps) -> None:
         try:
             data = SupportDocumentCreate(
                 reference_code=params.reference_code,
+                payment_details=[p.model_dump() for p in params.payment_details],
                 provider=params.provider,
                 items=[item_to_factus(i) for i in params.items],
                 observation=params.observation or "",
