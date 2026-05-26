@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
@@ -85,9 +85,12 @@ def get_engine(settings: Optional[Settings] = None) -> AsyncEngine:
                 "check_same_thread": False,
             }
         else:
-            # PostgreSQL: pool settings
+            # PostgreSQL: pool settings + SSL requerido (Supabase, Render, etc.)
             engine_kwargs["pool_size"] = 5
             engine_kwargs["max_overflow"] = 10
+            engine_kwargs["connect_args"] = {
+                "ssl": "require",
+            }
 
         _engine = create_async_engine(db_url, **engine_kwargs)
 
