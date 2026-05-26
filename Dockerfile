@@ -1,5 +1,10 @@
 FROM python:3.14-slim AS builder
 
+# ── Build tools (necesarios si alguna dependencia compila C, ej: asyncpg sin wheel) ──
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 # ── Instalar uv ─────────────────────────────────────────────────────────────
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
