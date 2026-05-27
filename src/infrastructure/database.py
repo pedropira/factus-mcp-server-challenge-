@@ -57,10 +57,30 @@ def _ensure_async_driver(url: str) -> str:
     return url
 
 
+def _strip_sslmode(url: str) -> str:
+    """Elimina sslmode de los query params de la URL.
+
+    asyncpg NO acepta 'sslmode' como parámetro de conexión (es de libpq).
+    Como ya manejamos SSL via connect_args en get_engine(), removemos
+    el parámetro para evitar el crash.
+    """
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    params = parse_qs(parsed.query)
+    params.pop("sslmode", None)
+    if not params:
+        new_query = ""
+    else:
+        new_query = urlencode(params, doseq=True)
+    return urlunparse(parsed._replace(query=new_query))
+
+
 def _resolve_db_url(settings: Optional[Settings] = None) -> str:
     """Obtiene y normaliza la URL de base de datos."""
     db_url = settings.DATABASE_URL if settings else Settings().DATABASE_URL
-    return _ensure_async_driver(db_url)
+    db_url = _ensure_async_driver(db_url)
+    return _strip_sslmode(db_url)
 
 
 def get_engine(settings: Optional[Settings] = None) -> AsyncEngine:
